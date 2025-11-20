@@ -1,7 +1,7 @@
 import pandas as pd
 import re
 from sqlalchemy.orm import Session
-from database import UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Adquisicion, Alerta, SessionLocal
+from database import UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Adquisicion, AdquisicionDetalle, AdquisicionProceso, Alerta, SessionLocal
 import numpy as np
 
 def inicializar_datos_ejemplo(db: Session):
@@ -214,5 +214,42 @@ def obtener_adquisiciones_df(db: Session):
         'Fecha_Adjudicacion': a.Fecha_Adjudicacion,
         'Avance_%': round((a.Monto_Adjudicado / a.Monto_Referencial * 100) if a.Monto_Referencial > 0 else 0, 2)
     } for a in adquisiciones])
+    
+    return df
+
+def obtener_detalle_adquisicion(db: Session, codigo_adquisicion: str):
+    """Obtiene el detalle completo de una adquisición por su código"""
+    adq = db.query(Adquisicion).filter(Adquisicion.codigo_adquisicion == codigo_adquisicion).first()
+    if not adq:
+        return None
+    
+    detalle = db.query(AdquisicionDetalle).filter(AdquisicionDetalle.adquisicion_id == adq.id).first()
+    procesos = db.query(AdquisicionProceso).filter(
+        AdquisicionProceso.adquisicion_id == adq.id
+    ).order_by(AdquisicionProceso.orden).all()
+    
+    return {
+        'adquisicion': adq,
+        'detalle': detalle,
+        'procesos': procesos
+    }
+
+def obtener_procesos_df(db: Session, adquisicion_id: int):
+    """Obtiene los procesos de una adquisición como DataFrame para visualización"""
+    procesos = db.query(AdquisicionProceso).filter(
+        AdquisicionProceso.adquisicion_id == adquisicion_id
+    ).order_by(AdquisicionProceso.orden).all()
+    
+    df = pd.DataFrame([{
+        'Orden': p.orden,
+        'Hito': p.hito,
+        'Tipo_Flujo': p.tipo_flujo,
+        'Responsable': p.responsable_area,
+        'Correo': p.responsable_correo if p.responsable_correo else '',
+        'Fecha_Inicio': p.fecha_inicio,
+        'Fecha_Fin': p.fecha_fin,
+        'Dias': p.dias_transcurridos,
+        'Comentarios': p.comentarios if p.comentarios else ''
+    } for p in procesos])
     
     return df

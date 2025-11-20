@@ -1,6 +1,6 @@
 import random
 from datetime import datetime, timedelta
-from database import SessionLocal, Base, engine, UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Adquisicion
+from database import SessionLocal, Base, engine, UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Adquisicion, AdquisicionDetalle, AdquisicionProceso
 from sqlalchemy import text
 
 def crear_tablas():
@@ -11,6 +11,14 @@ def crear_tablas():
 def limpiar_base_datos():
     """Elimina todos los datos existentes"""
     with engine.connect() as conn:
+        try:
+            conn.execute(text("DELETE FROM adquisiciones_proceso"))
+        except:
+            pass
+        try:
+            conn.execute(text("DELETE FROM adquisiciones_detalle"))
+        except:
+            pass
         try:
             conn.execute(text("DELETE FROM adquisiciones"))
         except:
@@ -256,6 +264,92 @@ def generar_adquisiciones(db, ues_dict, metas_dict, año, target_count=274):
     print(f"✅ {actual_count} registros de Adquisiciones para {año}")
     return actual_count
 
+def generar_detalles_y_procesos_adquisiciones(db, año):
+    """Genera detalles y procesos para todas las adquisiciones del año"""
+    random.seed(año + 2000)
+    
+    adquisiciones = db.query(Adquisicion).filter(Adquisicion.año == año).all()
+    
+    tipos_servicio = [
+        "SERVICIO",
+        "BIEN",
+        "OBRA",
+        "CONSULTORÍA"
+    ]
+    
+    unidades_responsables = [
+        "INFRAESTRUCTURA",
+        "TIC",
+        "ADMINISTRACIÓN",
+        "LOGÍSTICA"
+    ]
+    
+    hitos = [
+        "Solicitud de Requerimiento TIC",
+        "Solicitud de Indagación de Mercado",
+        "Envío de cotizaciones a OTIN",
+        "Evaluación Técnica - OTIN",
+        "Envío de Cuadro Comparativo",
+        "Solicitud de Certificación Presupuestal",
+        "Envío de Orden de Compra/Servicio",
+        "Conformidad - OTIN"
+    ]
+    
+    responsables = [
+        ("OTIN", "OF-035-2020-INEI", "Correo de Esther"),
+        ("OTA", "OF-136-2020-INEI", "Correo de Henry"),
+        ("OTIN", "OF-035-2020-INEI", "Correo de Fernanda"),
+        ("OTA", "OF-136-2020-INEI", "Correo de Henry")
+    ]
+    
+    detalles_count = 0
+    procesos_count = 0
+    
+    for adq in adquisiciones:
+        detalle = AdquisicionDetalle(
+            adquisicion_id=adq.id,
+            requerimientos_total=random.randint(1, 5),
+            requerimientos_adquiridos=random.randint(0, 5),
+            tipo_servicio=tipos_servicio[random.randint(0, len(tipos_servicio)-1)],
+            pim_asignado=adq.monto_referencial * random.uniform(0.8, 1.2),
+            unidad_responsable=unidades_responsables[random.randint(0, len(unidades_responsables)-1)]
+        )
+        db.add(detalle)
+        detalles_count += 1
+        
+        num_pasos = random.randint(5, 8)
+        fecha_actual = adq.fecha_convocatoria if adq.fecha_convocatoria else datetime(año, 1, 1)
+        
+        for orden in range(num_pasos):
+            hito = hitos[min(orden, len(hitos)-1)]
+            area, codigo, correo = responsables[orden % len(responsables)]
+            
+            dias = random.randint(1, 15)
+            fecha_fin = fecha_actual + timedelta(days=dias)
+            
+            proceso = AdquisicionProceso(
+                adquisicion_id=adq.id,
+                orden=orden + 1,
+                hito=hito,
+                tipo_flujo=area,
+                responsable_area=area,
+                responsable_correo=correo,
+                fecha_inicio=fecha_actual,
+                fecha_fin=fecha_fin if orden < num_pasos - 1 else None,
+                dias_transcurridos=dias,
+                comentarios=f"Proceso tramitado mediante {codigo}"
+            )
+            db.add(proceso)
+            procesos_count += 1
+            
+            fecha_actual = fecha_fin
+    
+    db.commit()
+    
+    print(f"✅ {detalles_count} detalles de adquisiciones para {año}")
+    print(f"✅ {procesos_count} procesos de adquisiciones para {año}")
+    return detalles_count, procesos_count
+
 def main():
     """Función principal para generar datos seed
     
@@ -279,17 +373,25 @@ def main():
         total_adq_2024 = generar_adquisiciones(db, ues_dict, metas_dict, 2024, target_count=274)
         total_adq_2025 = generar_adquisiciones(db, ues_dict, metas_dict, 2025, target_count=274)
         
+        detalles_2024, procesos_2024 = generar_detalles_y_procesos_adquisiciones(db, 2024)
+        detalles_2025, procesos_2025 = generar_detalles_y_procesos_adquisiciones(db, 2025)
+        
         total_prog = total_prog_2024 + total_prog_2025
         total_adq = total_adq_2024 + total_adq_2025
+        total_detalles = detalles_2024 + detalles_2025
+        total_procesos = procesos_2024 + procesos_2025
         
         print(f"\n📊 Resumen:")
         print(f"   - {len(ues_dict)} Unidades Ejecutoras")
         print(f"   - {len(metas_dict)} Metas Presupuestales")
         print(f"   - {total_prog} Programaciones Presupuestales (2024: {total_prog_2024}, 2025: {total_prog_2025})")
         print(f"   - {total_adq} Adquisiciones (2024: {total_adq_2024}, 2025: {total_adq_2025})")
+        print(f"   - {total_detalles} Detalles de Adquisiciones")
+        print(f"   - {total_procesos} Procesos de Adquisiciones")
         
         assert total_prog == 1094, f"Expected 1094 programaciones, got {total_prog}"
         assert total_adq == 548, f"Expected 548 adquisiciones, got {total_adq}"
+        assert total_detalles == 548, f"Expected 548 detalles, got {total_detalles}"
         
         print(f"\n✅ Datos seed generados exitosamente con cantidades exactas verificadas!\n")
         

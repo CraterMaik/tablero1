@@ -79,6 +79,42 @@ class Adquisicion(Base):
     
     unidad_ejecutora = relationship("UnidadEjecutora")
     meta = relationship("MetaPresupuestal")
+    detalle = relationship("AdquisicionDetalle", back_populates="adquisicion", uselist=False)
+    procesos = relationship("AdquisicionProceso", back_populates="adquisicion", order_by="AdquisicionProceso.orden")
+
+class AdquisicionDetalle(Base):
+    __tablename__ = 'adquisiciones_detalle'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    adquisicion_id = Column(Integer, ForeignKey('adquisiciones.id'), nullable=False, unique=True)
+    requerimientos_total = Column(Integer, default=1)
+    requerimientos_adquiridos = Column(Integer, default=0)
+    tipo_servicio = Column(String, nullable=True)
+    pim_asignado = Column(Float, default=0)
+    unidad_responsable = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    adquisicion = relationship("Adquisicion", back_populates="detalle")
+
+class AdquisicionProceso(Base):
+    __tablename__ = 'adquisiciones_proceso'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    adquisicion_id = Column(Integer, ForeignKey('adquisiciones.id'), nullable=False)
+    orden = Column(Integer, nullable=False)
+    hito = Column(String, nullable=False)
+    tipo_flujo = Column(String, nullable=False)
+    responsable_area = Column(String, nullable=False)
+    responsable_correo = Column(String, nullable=True)
+    fecha_inicio = Column(DateTime, nullable=False)
+    fecha_fin = Column(DateTime, nullable=True)
+    dias_transcurridos = Column(Integer, default=0)
+    comentarios = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    adquisicion = relationship("Adquisicion", back_populates="procesos")
 
 class Alerta(Base):
     __tablename__ = 'alertas'
