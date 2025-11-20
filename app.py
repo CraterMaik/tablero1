@@ -10,23 +10,16 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
 from reportlab.lib.units import inch
 import xlsxwriter
-from database import SessionLocal, init_db, UnidadEjecutora
+from database import SessionLocal, UnidadEjecutora
 from db_operations import inicializar_datos_ejemplo, obtener_programacion_df, procesar_archivo_programacion, obtener_alertas, crear_alerta, eliminar_alerta
 
 st.set_page_config(page_title="Dashboard de Programación Presupuestal", layout="wide", initial_sidebar_state="expanded")
-
-init_db()
-
-@st.cache_resource
-def get_db_session():
-    return SessionLocal()
 
 @st.cache_data(ttl=60)
 def cargar_datos():
     """Carga datos desde la base de datos"""
     db = SessionLocal()
     try:
-        inicializar_datos_ejemplo(db)
         df_programacion = obtener_programacion_df(db)
         return df_programacion
     finally:
@@ -383,74 +376,77 @@ with tabs[1]:
 with tabs[2]:
     st.header("⚠️ Alertas de Presupuesto")
     
-    db = get_db_session()
-    alertas = obtener_alertas(db)
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("Alertas Activas")
-        if alertas:
-            for alerta in alertas:
-                ue_nombre = "Todas"
-                if alerta.unidad_ejecutora_id:
-                    ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.id == alerta.unidad_ejecutora_id).first()
-                    if ue:
-                        ue_nombre = ue.codigo
-                
-                col_a, col_b = st.columns([4, 1])
-                with col_a:
-                    st.info(f"🔔 **{alerta.nombre}** - UE: {ue_nombre} - Umbral: {alerta.umbral_porcentaje}%")
-                with col_b:
-                    if st.button("Eliminar", key=f"del_{alerta.id}"):
-                        eliminar_alerta(db, alerta.id)
-                        st.rerun()
-        else:
-            st.info("No hay alertas configuradas")
-    
-    with col2:
-        st.subheader("Nueva Alerta")
+    db = SessionLocal()
+    try:
+        alertas = obtener_alertas(db)
         
-        nombre_alerta = st.text_input("Nombre de la alerta")
+        col1, col2 = st.columns([2, 1])
         
-        ues = db.query(UnidadEjecutora).all()
-        ue_options = ["Todas"] + [ue.codigo for ue in ues]
-        ue_alerta = st.selectbox("Unidad Ejecutora", ue_options)
-        
-        umbral_alerta = st.slider("Umbral de ejecución (%)", 0, 100, 80)
-        
-        if st.button("Crear Alerta"):
-            if nombre_alerta:
-                ue_id = None
-                if ue_alerta != "Todas":
-                    ue_obj = db.query(UnidadEjecutora).filter(UnidadEjecutora.codigo == ue_alerta).first()
-                    if ue_obj:
-                        ue_id = ue_obj.id
-                
-                crear_alerta(db, nombre_alerta, ue_id, umbral_alerta)
-                st.success("✅ Alerta creada exitosamente")
-                st.rerun()
+        with col1:
+            st.subheader("Alertas Activas")
+            if alertas:
+                for alerta in alertas:
+                    ue_nombre = "Todas"
+                    if alerta.unidad_ejecutora_id:
+                        ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.id == alerta.unidad_ejecutora_id).first()
+                        if ue:
+                            ue_nombre = ue.codigo
+                    
+                    col_a, col_b = st.columns([4, 1])
+                    with col_a:
+                        st.info(f"🔔 **{alerta.nombre}** - UE: {ue_nombre} - Umbral: {alerta.umbral_porcentaje}%")
+                    with col_b:
+                        if st.button("Eliminar", key=f"del_{alerta.id}"):
+                            eliminar_alerta(db, alerta.id)
+                            st.rerun()
             else:
-                st.error("❌ Ingrese un nombre para la alerta")
-    
-    st.markdown("---")
-    st.subheader("📊 Estado de Alertas")
-    
-    alertas_activas = df_programacion.groupby('UE').agg({
-        'PIM': 'sum',
-        'Certificado': 'sum'
-    }).reset_index()
-    alertas_activas['Ejecución_%'] = (alertas_activas['Certificado'] / alertas_activas['PIM'] * 100).round(2)
-    
-    for alerta in alertas:
-        if alerta.unidad_ejecutora_id:
-            ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.id == alerta.unidad_ejecutora_id).first()
-            if ue:
-                ue_data = alertas_activas[alertas_activas['UE'] == ue.codigo]
-                if not ue_data.empty:
-                    ejecucion = ue_data.iloc[0]['Ejecución_%']
-                    if ejecucion >= alerta.umbral_porcentaje:
-                        st.warning(f"⚠️ **{alerta.nombre}**: {ue.codigo} ha alcanzado {ejecucion:.2f}% (Umbral: {alerta.umbral_porcentaje}%)")
+                st.info("No hay alertas configuradas")
+        
+        with col2:
+            st.subheader("Nueva Alerta")
+            
+            nombre_alerta = st.text_input("Nombre de la alerta")
+            
+            ues = db.query(UnidadEjecutora).all()
+            ue_options = ["Todas"] + [ue.codigo for ue in ues]
+            ue_alerta = st.selectbox("Unidad Ejecutora", ue_options)
+            
+            umbral_alerta = st.slider("Umbral de ejecución (%)", 0, 100, 80)
+            
+            if st.button("Crear Alerta"):
+                if nombre_alerta:
+                    ue_id = None
+                    if ue_alerta != "Todas":
+                        ue_obj = db.query(UnidadEjecutora).filter(UnidadEjecutora.codigo == ue_alerta).first()
+                        if ue_obj:
+                            ue_id = ue_obj.id
+                    
+                    crear_alerta(db, nombre_alerta, ue_id, umbral_alerta)
+                    st.success("✅ Alerta creada exitosamente")
+                    st.rerun()
+                else:
+                    st.error("❌ Ingrese un nombre para la alerta")
+        
+        st.markdown("---")
+        st.subheader("📊 Estado de Alertas")
+        
+        alertas_activas = df_programacion.groupby('UE').agg({
+            'PIM': 'sum',
+            'Certificado': 'sum'
+        }).reset_index()
+        alertas_activas['Ejecución_%'] = (alertas_activas['Certificado'] / alertas_activas['PIM'] * 100).round(2)
+        
+        for alerta in alertas:
+            if alerta.unidad_ejecutora_id:
+                ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.id == alerta.unidad_ejecutora_id).first()
+                if ue:
+                    ue_data = alertas_activas[alertas_activas['UE'] == ue.codigo]
+                    if not ue_data.empty:
+                        ejecucion = ue_data.iloc[0]['Ejecución_%']
+                        if ejecucion >= alerta.umbral_porcentaje:
+                            st.warning(f"⚠️ **{alerta.nombre}**: {ue.codigo} ha alcanzado {ejecucion:.2f}% (Umbral: {alerta.umbral_porcentaje}%)")
+    finally:
+        db.close()
 
 with tabs[3]:
     st.header("📊 Análisis Comparativo")

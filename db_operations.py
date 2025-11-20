@@ -48,9 +48,7 @@ def procesar_archivo_programacion(db: Session, archivo, año: int):
         for idx, row in df.iterrows():
             desc = str(row['Descripcion']).strip()
             
-            if pd.isna(row['PIM']):
-                continue
-            
+            # Check for UE row first (UE rows have empty PIM)
             if re.match(r'^[A-Z]{3,5}$', desc):
                 ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.codigo == desc).first()
                 if not ue:
@@ -61,6 +59,7 @@ def procesar_archivo_programacion(db: Session, archivo, año: int):
                 meta_actual = None
                 continue
             
+            # Check for Meta row (Meta rows also have empty PIM)
             if desc.startswith('0') and ' - ' in desc:
                 partes = desc.split(' - ', 1)
                 codigo_meta = partes[0].strip()
@@ -78,6 +77,11 @@ def procesar_archivo_programacion(db: Session, archivo, año: int):
                 meta_actual = meta
                 continue
             
+            # Skip rows without PIM value (after checking for UE/Meta)
+            if pd.isna(row['PIM']):
+                continue
+            
+            # Skip if we don't have a UE context yet
             if ue_actual is None:
                 continue
             
