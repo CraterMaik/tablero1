@@ -1,7 +1,7 @@
 import pandas as pd
 import re
 from sqlalchemy.orm import Session
-from database import UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Alerta, SessionLocal
+from database import UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Adquisicion, Alerta, SessionLocal
 import numpy as np
 
 def inicializar_datos_ejemplo(db: Session):
@@ -177,3 +177,42 @@ def eliminar_alerta(db: Session, alerta_id: int):
         db.commit()
         return True
     return False
+
+def obtener_adquisiciones_df(db: Session):
+    """Obtiene todas las adquisiciones como DataFrame"""
+    adquisiciones = db.query(
+        Adquisicion.año.label('Año'),
+        UnidadEjecutora.codigo.label('UE'),
+        UnidadEjecutora.nombre.label('UE_Nombre'),
+        MetaPresupuestal.codigo.label('Meta_Codigo'),
+        MetaPresupuestal.descripcion.label('Meta'),
+        Adquisicion.codigo_adquisicion.label('Código'),
+        Adquisicion.descripcion.label('Descripción'),
+        Adquisicion.tipo_proceso.label('Tipo_Proceso'),
+        Adquisicion.estado.label('Estado'),
+        Adquisicion.monto_referencial.label('Monto_Referencial'),
+        Adquisicion.monto_adjudicado.label('Monto_Adjudicado'),
+        Adquisicion.proveedor.label('Proveedor'),
+        Adquisicion.fecha_convocatoria.label('Fecha_Convocatoria'),
+        Adquisicion.fecha_adjudicacion.label('Fecha_Adjudicacion')
+    ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).all()
+    
+    df = pd.DataFrame([{
+        'Año': a.Año,
+        'UE': a.UE,
+        'UE_Nombre': a.UE_Nombre,
+        'Meta_Codigo': a.Meta_Codigo if a.Meta_Codigo else '',
+        'Meta': a.Meta if a.Meta else 'Sin Meta',
+        'Código': a.Código if a.Código else '',
+        'Descripción': a.Descripción,
+        'Tipo_Proceso': a.Tipo_Proceso if a.Tipo_Proceso else 'No especificado',
+        'Estado': a.Estado,
+        'Monto_Referencial': a.Monto_Referencial,
+        'Monto_Adjudicado': a.Monto_Adjudicado,
+        'Proveedor': a.Proveedor if a.Proveedor else 'Sin proveedor',
+        'Fecha_Convocatoria': a.Fecha_Convocatoria,
+        'Fecha_Adjudicacion': a.Fecha_Adjudicacion,
+        'Avance_%': round((a.Monto_Adjudicado / a.Monto_Referencial * 100) if a.Monto_Referencial > 0 else 0, 2)
+    } for a in adquisiciones])
+    
+    return df
