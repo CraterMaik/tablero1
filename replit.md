@@ -99,3 +99,17 @@ Preferred communication style: Simple, everyday language in Spanish.
   - No SSL errors when changing filters multiple times
   - Smooth operation across both tabs (Presupuestal General, Adquisiciones)
   - Stable performance with year, meta, and UE filter combinations
+
+### Phase 3: Additional Acquisition Analytics (November 20)
+- ✅ **New Monthly Spending Chart**: Added "Gasto por Mes" visualization
+  - Bar chart showing acquisitions spending grouped by month
+  - Extracts month from Fecha_Adjudicacion field
+  - Shows total Monto_Adjudicado per month
+  - Respects all active filters (year, meta, UE)
+  - Displays only months with adjudicated acquisitions
+- ✅ **Top 10 Spending Chart**: Added "Top 10 Más Gastadas" visualization
+  - Horizontal bar chart showing top 10 acquisitions by spending
+  - Ordered by Monto_Adjudicado (highest to lowest)
+  - Truncated descriptions for better readability
+  - Hover shows full details (code, description, amount)
+  - Respects all active filters

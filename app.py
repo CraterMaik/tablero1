@@ -474,6 +474,60 @@ with tabs[1]:
         
         st.markdown("---")
         
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.subheader("📅 Gasto por Mes")
+            
+            # Preparar datos: extraer mes de fecha de adjudicación
+            df_con_fecha = df_adq_filtrado[df_adq_filtrado['Fecha_Adjudicacion'].notna()].copy()
+            
+            if len(df_con_fecha) > 0:
+                df_con_fecha['Mes'] = pd.to_datetime(df_con_fecha['Fecha_Adjudicacion']).dt.month
+                df_con_fecha['Mes_Nombre'] = pd.to_datetime(df_con_fecha['Fecha_Adjudicacion']).dt.strftime('%B')
+                
+                gastos_por_mes = df_con_fecha.groupby(['Mes', 'Mes_Nombre'])['Monto_Adjudicado'].sum().reset_index()
+                gastos_por_mes = gastos_por_mes.sort_values('Mes')
+                
+                fig_meses = px.bar(
+                    gastos_por_mes,
+                    x='Mes_Nombre',
+                    y='Monto_Adjudicado',
+                    title='Adquisiciones Gastadas por Mes',
+                    labels={'Monto_Adjudicado': 'Monto Adjudicado (S/)', 'Mes_Nombre': 'Mes'}
+                )
+                fig_meses.update_traces(marker_color='steelblue')
+                fig_meses.update_layout(height=400, showlegend=False)
+                st.plotly_chart(fig_meses, use_container_width=True)
+            else:
+                st.info("No hay adquisiciones con fecha de adjudicación para mostrar")
+        
+        with col4:
+            st.subheader("🏆 Top 10 Más Gastadas")
+            
+            top_10_adq = df_adq_filtrado.nlargest(10, 'Monto_Adjudicado')[['Código', 'Descripción', 'Monto_Adjudicado']].copy()
+            
+            if len(top_10_adq) > 0:
+                # Truncar descripción para mejor visualización
+                top_10_adq['Desc_Corta'] = top_10_adq['Descripción'].str[:30] + '...'
+                
+                fig_top10 = px.bar(
+                    top_10_adq,
+                    x='Monto_Adjudicado',
+                    y='Desc_Corta',
+                    orientation='h',
+                    title='Top 10 Adquisiciones con Mayor Gasto',
+                    labels={'Monto_Adjudicado': 'Monto Adjudicado (S/)', 'Desc_Corta': 'Adquisición'},
+                    hover_data={'Código': True, 'Descripción': True, 'Desc_Corta': False}
+                )
+                fig_top10.update_traces(marker_color='darkgreen')
+                fig_top10.update_layout(height=400, showlegend=False, yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig_top10, use_container_width=True)
+            else:
+                st.info("No hay datos suficientes para mostrar Top 10")
+        
+        st.markdown("---")
+        
         st.subheader("📋 Tabla Detallada de Adquisiciones")
         
         col_busq, col_sel, col_btn = st.columns([3, 2, 1])
