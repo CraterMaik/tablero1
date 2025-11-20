@@ -5,7 +5,15 @@ from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
 DATABASE_URL = os.getenv('DATABASE_URL')
-engine = create_engine(DATABASE_URL)
+# Configurar engine con pool_pre_ping para detectar conexiones cerradas
+# y pool_recycle para evitar conexiones SSL obsoletas
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verifica conexión antes de usar
+    pool_recycle=3600,   # Recicla conexiones cada hora
+    pool_size=5,         # Tamaño del pool
+    max_overflow=10      # Conexiones extras permitidas
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

@@ -119,40 +119,51 @@ def procesar_archivo_programacion(db: Session, archivo, año: int):
         db.rollback()
         return False, f"Error al procesar archivo: {str(e)}"
 
-def obtener_programacion_df(db: Session):
+def obtener_programacion_df(db: Session = None):
     """Obtiene todas las programaciones como DataFrame"""
-    programaciones = db.query(
-        ProgramacionPresupuestal.año.label('Año'),
-        UnidadEjecutora.codigo.label('UE'),
-        MetaPresupuestal.codigo.label('Meta_Codigo'),
-        MetaPresupuestal.descripcion.label('Meta'),
-        ProgramacionPresupuestal.clasificador.label('Clasificador'),
-        ProgramacionPresupuestal.descripcion_clasificador.label('Descripción'),
-        ProgramacionPresupuestal.pim.label('PIM'),
-        ProgramacionPresupuestal.certificado.label('Certificado'),
-        ProgramacionPresupuestal.pim_por_certificar.label('PIM_Por_Certificar'),
-        ProgramacionPresupuestal.devengado_acumulado.label('Devengado'),
-        ProgramacionPresupuestal.total_anual.label('Total_Anual'),
-        ProgramacionPresupuestal.saldo.label('Saldo')
-    ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).all()
+    # Crear sesión propia si no se proporciona una
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    else:
+        should_close = False
     
-    df = pd.DataFrame([{
-        'Año': p.Año,
-        'UE': p.UE,
-        'Meta_Codigo': p.Meta_Codigo if p.Meta_Codigo else '',
-        'Meta': p.Meta if p.Meta else 'Sin Meta',
-        'Clasificador': p.Clasificador if p.Clasificador else '',
-        'Descripción': p.Descripción,
-        'PIM': p.PIM,
-        'Certificado': p.Certificado,
-        'PIM_Por_Certificar': p.PIM_Por_Certificar,
-        'Devengado': p.Devengado,
-        'Total_Anual': p.Total_Anual,
-        'Saldo': p.Saldo,
-        'Ejecución_%': round((p.Certificado / p.PIM * 100) if p.PIM > 0 else 0, 2)
-    } for p in programaciones])
-    
-    return df
+    try:
+        programaciones = db.query(
+            ProgramacionPresupuestal.año.label('Año'),
+            UnidadEjecutora.codigo.label('UE'),
+            MetaPresupuestal.codigo.label('Meta_Codigo'),
+            MetaPresupuestal.descripcion.label('Meta'),
+            ProgramacionPresupuestal.clasificador.label('Clasificador'),
+            ProgramacionPresupuestal.descripcion_clasificador.label('Descripción'),
+            ProgramacionPresupuestal.pim.label('PIM'),
+            ProgramacionPresupuestal.certificado.label('Certificado'),
+            ProgramacionPresupuestal.pim_por_certificar.label('PIM_Por_Certificar'),
+            ProgramacionPresupuestal.devengado_acumulado.label('Devengado'),
+            ProgramacionPresupuestal.total_anual.label('Total_Anual'),
+            ProgramacionPresupuestal.saldo.label('Saldo')
+        ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).all()
+        
+        df = pd.DataFrame([{
+            'Año': p.Año,
+            'UE': p.UE,
+            'Meta_Codigo': p.Meta_Codigo if p.Meta_Codigo else '',
+            'Meta': p.Meta if p.Meta else 'Sin Meta',
+            'Clasificador': p.Clasificador if p.Clasificador else '',
+            'Descripción': p.Descripción,
+            'PIM': p.PIM,
+            'Certificado': p.Certificado,
+            'PIM_Por_Certificar': p.PIM_Por_Certificar,
+            'Devengado': p.Devengado,
+            'Total_Anual': p.Total_Anual,
+            'Saldo': p.Saldo,
+            'Ejecución_%': round((p.Certificado / p.PIM * 100) if p.PIM > 0 else 0, 2)
+        } for p in programaciones])
+        
+        return df
+    finally:
+        if should_close:
+            db.close()
 
 def obtener_alertas(db: Session):
     """Obtiene todas las alertas activas"""
@@ -178,44 +189,55 @@ def eliminar_alerta(db: Session, alerta_id: int):
         return True
     return False
 
-def obtener_adquisiciones_df(db: Session):
+def obtener_adquisiciones_df(db: Session = None):
     """Obtiene todas las adquisiciones como DataFrame"""
-    adquisiciones = db.query(
-        Adquisicion.año.label('Año'),
-        UnidadEjecutora.codigo.label('UE'),
-        UnidadEjecutora.nombre.label('UE_Nombre'),
-        MetaPresupuestal.codigo.label('Meta_Codigo'),
-        MetaPresupuestal.descripcion.label('Meta'),
-        Adquisicion.codigo_adquisicion.label('Código'),
-        Adquisicion.descripcion.label('Descripción'),
-        Adquisicion.tipo_proceso.label('Tipo_Proceso'),
-        Adquisicion.estado.label('Estado'),
-        Adquisicion.monto_referencial.label('Monto_Referencial'),
-        Adquisicion.monto_adjudicado.label('Monto_Adjudicado'),
-        Adquisicion.proveedor.label('Proveedor'),
-        Adquisicion.fecha_convocatoria.label('Fecha_Convocatoria'),
-        Adquisicion.fecha_adjudicacion.label('Fecha_Adjudicacion')
-    ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).all()
+    # Crear sesión propia si no se proporciona una
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+    else:
+        should_close = False
     
-    df = pd.DataFrame([{
-        'Año': a.Año,
-        'UE': a.UE,
-        'UE_Nombre': a.UE_Nombre,
-        'Meta_Codigo': a.Meta_Codigo if a.Meta_Codigo else '',
-        'Meta': a.Meta if a.Meta else 'Sin Meta',
-        'Código': a.Código if a.Código else '',
-        'Descripción': a.Descripción,
-        'Tipo_Proceso': a.Tipo_Proceso if a.Tipo_Proceso else 'No especificado',
-        'Estado': a.Estado,
-        'Monto_Referencial': a.Monto_Referencial,
-        'Monto_Adjudicado': a.Monto_Adjudicado,
-        'Proveedor': a.Proveedor if a.Proveedor else 'Sin proveedor',
-        'Fecha_Convocatoria': a.Fecha_Convocatoria,
-        'Fecha_Adjudicacion': a.Fecha_Adjudicacion,
-        'Avance_%': round((a.Monto_Adjudicado / a.Monto_Referencial * 100) if a.Monto_Referencial > 0 else 0, 2)
-    } for a in adquisiciones])
-    
-    return df
+    try:
+        adquisiciones = db.query(
+            Adquisicion.año.label('Año'),
+            UnidadEjecutora.codigo.label('UE'),
+            UnidadEjecutora.nombre.label('UE_Nombre'),
+            MetaPresupuestal.codigo.label('Meta_Codigo'),
+            MetaPresupuestal.descripcion.label('Meta'),
+            Adquisicion.codigo_adquisicion.label('Código'),
+            Adquisicion.descripcion.label('Descripción'),
+            Adquisicion.tipo_proceso.label('Tipo_Proceso'),
+            Adquisicion.estado.label('Estado'),
+            Adquisicion.monto_referencial.label('Monto_Referencial'),
+            Adquisicion.monto_adjudicado.label('Monto_Adjudicado'),
+            Adquisicion.proveedor.label('Proveedor'),
+            Adquisicion.fecha_convocatoria.label('Fecha_Convocatoria'),
+            Adquisicion.fecha_adjudicacion.label('Fecha_Adjudicacion')
+        ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).all()
+        
+        df = pd.DataFrame([{
+            'Año': a.Año,
+            'UE': a.UE,
+            'UE_Nombre': a.UE_Nombre,
+            'Meta_Codigo': a.Meta_Codigo if a.Meta_Codigo else '',
+            'Meta': a.Meta if a.Meta else 'Sin Meta',
+            'Código': a.Código if a.Código else '',
+            'Descripción': a.Descripción,
+            'Tipo_Proceso': a.Tipo_Proceso if a.Tipo_Proceso else 'No especificado',
+            'Estado': a.Estado,
+            'Monto_Referencial': a.Monto_Referencial,
+            'Monto_Adjudicado': a.Monto_Adjudicado,
+            'Proveedor': a.Proveedor if a.Proveedor else 'Sin proveedor',
+            'Fecha_Convocatoria': a.Fecha_Convocatoria,
+            'Fecha_Adjudicacion': a.Fecha_Adjudicacion,
+            'Avance_%': round((a.Monto_Adjudicado / a.Monto_Referencial * 100) if a.Monto_Referencial > 0 else 0, 2)
+        } for a in adquisiciones])
+        
+        return df
+    finally:
+        if should_close:
+            db.close()
 
 def obtener_detalle_adquisicion(db: Session, codigo_adquisicion: str):
     """Obtiene el detalle completo de una adquisición por su código"""

@@ -28,22 +28,14 @@ st.set_page_config(page_title="Dashboard de Programación Presupuestal", layout=
 @st.cache_data(ttl=60)
 def cargar_datos_programacion():
     """Carga datos de programación desde la base de datos"""
-    db = SessionLocal()
-    try:
-        df_programacion = obtener_programacion_df(db)
-        return df_programacion
-    finally:
-        db.close()
+    # Las funciones crean su propia sesión internamente
+    return obtener_programacion_df()
 
 @st.cache_data(ttl=60)
 def cargar_datos_adquisiciones():
     """Carga datos de adquisiciones desde la base de datos"""
-    db = SessionLocal()
-    try:
-        df_adquisiciones = obtener_adquisiciones_df(db)
-        return df_adquisiciones
-    finally:
-        db.close()
+    # Las funciones crean su propia sesión internamente
+    return obtener_adquisiciones_df()
 
 @st.dialog("Detalle de Adquisición", width="large")
 def mostrar_detalle_adquisicion(codigo_adquisicion):
