@@ -11,7 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 import xlsxwriter
 from database import SessionLocal, init_db, Direccion, Meta
-from db_operations import inicializar_datos_ejemplo, obtener_adquisiciones_df, obtener_presupuestos_df, cargar_datos_desde_excel, obtener_alertas, crear_alerta, eliminar_alerta
+from db_operations import inicializar_datos_ejemplo, obtener_adquisiciones_df, obtener_presupuestos_df, cargar_datos_desde_archivo, obtener_alertas, crear_alerta, eliminar_alerta
 
 st.set_page_config(page_title="Dashboard de Adquisiciones", layout="wide", initial_sidebar_state="expanded")
 
@@ -34,6 +34,7 @@ def cargar_datos():
         db.close()
 
 df_adquisiciones, df_presupuestos = cargar_datos()
+df_comparacion = pd.DataFrame()
 
 st.title("📊 Dashboard de Control de Adquisiciones")
 
@@ -105,7 +106,7 @@ with tabs[0]:
         monto_total = df_filtrado['Monto'].sum()
         st.metric(
             label="Gasto Total",
-            value=f"${monto_total:,.0f}",
+            value=f"S/ {monto_total:,.0f}",
             delta=f"{(monto_total/1000000):.1f}M"
         )
     
@@ -121,7 +122,7 @@ with tabs[0]:
         presupuesto_total = df_pres_filtrado['Presupuesto'].sum()
         st.metric(
             label="Presupuesto Total",
-            value=f"${presupuesto_total:,.0f}",
+            value=f"S/ {presupuesto_total:,.0f}",
             delta=f"{(presupuesto_total/1000000):.1f}M"
         )
     
@@ -151,7 +152,7 @@ with tabs[0]:
             y='Dirección',
             orientation='h',
             title="Gasto Total por Dirección",
-            labels={'Monto': 'Monto ($)', 'Dirección': 'Dirección'},
+            labels={'Monto': 'Monto (S/)', 'Dirección': 'Dirección'},
             color='Monto',
             color_continuous_scale='Blues'
         )
@@ -232,7 +233,7 @@ with tabs[0]:
         fig_comp.update_layout(
             title='Comparación Presupuesto vs Gasto Real',
             xaxis_title='Dirección - Año',
-            yaxis_title='Monto ($)',
+            yaxis_title='Monto (S/)',
             barmode='group',
             height=500,
             xaxis_tickangle=-45
@@ -253,9 +254,9 @@ with tabs[0]:
         df_comparacion['Estatus'] = df_comparacion['Porcentaje'].apply(obtener_estatus)
     
         df_tabla = df_comparacion.copy()
-        df_tabla['Presupuesto'] = df_tabla['Presupuesto'].apply(lambda x: f"${x:,.0f}")
-        df_tabla['Gasto'] = df_tabla['Gasto'].apply(lambda x: f"${x:,.0f}")
-        df_tabla['Disponible'] = df_tabla['Disponible'].apply(lambda x: f"${x:,.0f}")
+        df_tabla['Presupuesto'] = df_tabla['Presupuesto'].apply(lambda x: f"S/ {x:,.0f}")
+        df_tabla['Gasto'] = df_tabla['Gasto'].apply(lambda x: f"S/ {x:,.0f}")
+        df_tabla['Disponible'] = df_tabla['Disponible'].apply(lambda x: f"S/ {x:,.0f}")
         df_tabla['Porcentaje'] = df_tabla['Porcentaje'].apply(lambda x: f"{x:.1f}%")
     
         st.dataframe(
@@ -293,7 +294,7 @@ with tabs[0]:
             x='Meta',
             y='Monto',
             title='Gasto Total por Meta',
-            labels={'Monto': 'Monto ($)', 'Meta': 'Meta'},
+            labels={'Monto': 'Monto (S/)', 'Meta': 'Meta'},
             color='Monto',
             color_continuous_scale='Oranges'
         )
@@ -313,7 +314,7 @@ with tabs[0]:
             y='Monto',
             title='Evolución del Gasto por Año',
             markers=True,
-            labels={'Monto': 'Monto ($)', 'Año': 'Año'}
+            labels={'Monto': 'Monto (S/)', 'Año': 'Año'}
         )
         fig_año.update_traces(line_color='#1f77b4', marker_size=10)
         fig_año.update_layout(height=400)
@@ -332,7 +333,7 @@ with tabs[0]:
             color='Año',
             title='Evolución Mensual del Gasto',
             markers=True,
-            labels={'Monto': 'Monto ($)', 'Periodo': 'Periodo'}
+            labels={'Monto': 'Monto (S/)', 'Periodo': 'Periodo'}
         )
         fig_mensual.update_layout(height=400, xaxis_tickangle=-45)
         st.plotly_chart(fig_mensual, width='stretch')
@@ -346,7 +347,7 @@ with tabs[0]:
             x='Mes',
             y='Monto',
             title=f'Gasto Mensual - Año {año_seleccionado}',
-            labels={'Monto': 'Monto ($)', 'Mes': 'Mes'},
+            labels={'Monto': 'Monto (S/)', 'Mes': 'Mes'},
             color='Monto',
             color_continuous_scale='Viridis'
         )
@@ -370,7 +371,7 @@ with tabs[0]:
     df_tabla_detalle = df_tabla_detalle.sort_values('Monto', ascending=False)
     
     df_tabla_display = df_tabla_detalle[['ID', 'Dirección', 'Meta', 'Año', 'Mes', 'Descripción', 'Monto', 'Estado']].copy()
-    df_tabla_display['Monto'] = df_tabla_display['Monto'].apply(lambda x: f"${x:,.0f}")
+    df_tabla_display['Monto'] = df_tabla_display['Monto'].apply(lambda x: f"S/ {x:,.0f}")
     
     st.dataframe(
         df_tabla_display,
@@ -401,21 +402,24 @@ with tabs[1]:
         """)
         
         archivo_carga = st.file_uploader(
-            "Cargar archivo Excel (.xlsx)",
-            type=['xlsx'],
+            "Cargar archivo Excel (.xlsx) o CSV (.csv)",
+            type=['xlsx', 'csv'],
             key="file_uploader"
         )
         
         if archivo_carga and st.button("Importar Datos"):
             try:
                 db = SessionLocal()
-                if cargar_datos_desde_excel(db, archivo_carga, tipo_importacion):
+                formato = 'csv' if archivo_carga.name.endswith('.csv') else 'xlsx'
+                if cargar_datos_desde_archivo(db, archivo_carga, tipo_importacion, formato):
                     st.success(f"✅ Datos de {tipo_importacion} importados exitosamente")
                     st.cache_data.clear()
                     st.rerun()
                 else:
                     st.error("❌ Error al importar datos")
                 db.close()
+            except ValueError as e:
+                st.error(f"❌ Error de validación: {str(e)}")
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
     
@@ -431,15 +435,51 @@ with tabs[1]:
             if formato_exportacion == "Excel":
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    workbook = writer.book
+                    
                     df_adquisiciones.to_excel(writer, sheet_name='Adquisiciones', index=False)
                     df_presupuestos.to_excel(writer, sheet_name='Presupuestos', index=False)
                     
                     if len(df_comparacion) > 0:
                         df_comparacion.to_excel(writer, sheet_name='Comparativa', index=False)
+                    
+                    gasto_por_dir = df_adquisiciones.groupby('Dirección')['Monto'].sum().reset_index()
+                    gasto_por_dir = gasto_por_dir.sort_values('Monto', ascending=False)
+                    gasto_por_meta = df_adquisiciones.groupby('Meta')['Monto'].sum().reset_index()
+                    
+                    gasto_por_dir.to_excel(writer, sheet_name='Datos_Gráficos', index=False, startrow=0, startcol=0)
+                    gasto_por_meta.to_excel(writer, sheet_name='Datos_Gráficos', index=False, startrow=len(gasto_por_dir)+2, startcol=0)
+                    
+                    graficos_sheet = workbook.add_worksheet('Gráficos')
+                    
+                    chart1 = workbook.add_chart({'type': 'column'})
+                    chart1.add_series({
+                        'name': 'Gasto por Dirección',
+                        'categories': ['Datos_Gráficos', 1, 0, len(gasto_por_dir), 0],
+                        'values': ['Datos_Gráficos', 1, 1, len(gasto_por_dir), 1],
+                    })
+                    chart1.set_title({'name': 'Gasto Total por Dirección'})
+                    chart1.set_x_axis({'name': 'Dirección'})
+                    chart1.set_y_axis({'name': 'Monto (S/)'})
+                    chart1.set_legend({'position': 'none'})
+                    chart1.set_size({'width': 600, 'height': 400})
+                    
+                    graficos_sheet.insert_chart('B2', chart1)
+                    
+                    chart2 = workbook.add_chart({'type': 'pie'})
+                    chart2.add_series({
+                        'name': 'Gasto por Meta',
+                        'categories': ['Datos_Gráficos', len(gasto_por_dir)+3, 0, len(gasto_por_dir)+len(gasto_por_meta)+2, 0],
+                        'values': ['Datos_Gráficos', len(gasto_por_dir)+3, 1, len(gasto_por_dir)+len(gasto_por_meta)+2, 1],
+                    })
+                    chart2.set_title({'name': 'Distribución de Gasto por Meta'})
+                    chart2.set_size({'width': 600, 'height': 400})
+                    
+                    graficos_sheet.insert_chart('K2', chart2)
                 
                 output.seek(0)
                 st.download_button(
-                    label="⬇️ Descargar Reporte Excel",
+                    label="⬇️ Descargar Reporte Excel con Gráficos",
                     data=output,
                     file_name=f"reporte_adquisiciones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -460,8 +500,8 @@ with tabs[1]:
                 data_resumen = [
                     ['Métrica', 'Valor'],
                     ['Total Adquisiciones', f"{len(df_adquisiciones):,}"],
-                    ['Gasto Total', f"${df_adquisiciones['Monto'].sum():,.0f}"],
-                    ['Presupuesto Total', f"${df_presupuestos['Presupuesto'].sum():,.0f}"]
+                    ['Gasto Total', f"S/ {df_adquisiciones['Monto'].sum():,.0f}"],
+                    ['Presupuesto Total', f"S/ {df_presupuestos['Presupuesto'].sum():,.0f}"]
                 ]
                 
                 tabla_resumen = Table(data_resumen)
@@ -475,12 +515,52 @@ with tabs[1]:
                     ('GRID', (0, 0), (-1, -1), 1, colors.black)
                 ]))
                 story.append(tabla_resumen)
+                story.append(Spacer(1, 0.2*inch))
+                
+                story.append(PageBreak())
+                story.append(Paragraph("Análisis de Gasto por Dirección", styles['Heading1']))
+                story.append(Spacer(1, 0.2*inch))
+                
+                gasto_por_dir = df_adquisiciones.groupby('Dirección')['Monto'].sum().reset_index()
+                gasto_por_dir = gasto_por_dir.sort_values('Monto', ascending=False)
+                
+                fig_dir = px.bar(
+                    gasto_por_dir,
+                    x='Monto',
+                    y='Dirección',
+                    orientation='h',
+                    title="Gasto Total por Dirección",
+                    labels={'Monto': 'Monto (S/)', 'Dirección': 'Dirección'}
+                )
+                
+                img_bytes = fig_dir.to_image(format="png", width=600, height=400)
+                img_buffer = io.BytesIO(img_bytes)
+                img = Image(img_buffer, width=5*inch, height=3.3*inch)
+                story.append(img)
+                story.append(Spacer(1, 0.2*inch))
+                
+                story.append(PageBreak())
+                story.append(Paragraph("Distribución de Gasto por Meta", styles['Heading1']))
+                story.append(Spacer(1, 0.2*inch))
+                
+                gasto_por_meta = df_adquisiciones.groupby('Meta')['Monto'].sum().reset_index()
+                fig_meta = px.pie(
+                    gasto_por_meta,
+                    values='Monto',
+                    names='Meta',
+                    title='Distribución de Gasto por Meta'
+                )
+                
+                img_bytes_meta = fig_meta.to_image(format="png", width=600, height=400)
+                img_buffer_meta = io.BytesIO(img_bytes_meta)
+                img_meta = Image(img_buffer_meta, width=5*inch, height=3.3*inch)
+                story.append(img_meta)
                 
                 doc.build(story)
                 buffer.seek(0)
                 
                 st.download_button(
-                    label="⬇️ Descargar Reporte PDF",
+                    label="⬇️ Descargar Reporte PDF con Gráficos",
                     data=buffer,
                     file_name=f"reporte_adquisiciones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf"
@@ -592,20 +672,20 @@ with tabs[3]:
             
             st.metric(
                 label=f"Gasto Total {año_base}",
-                value=f"${gasto_base:,.0f}"
+                value=f"S/ {gasto_base:,.0f}"
             )
         
         with col2:
             st.metric(
                 label=f"Gasto Total {año_comparacion}",
-                value=f"${gasto_comp:,.0f}"
+                value=f"S/ {gasto_comp:,.0f}"
             )
         
         with col3:
             st.metric(
                 label="Variación",
                 value=f"{variacion:+.1f}%",
-                delta=f"${(gasto_comp - gasto_base):,.0f}"
+                delta=f"S/ {(gasto_comp - gasto_base):,.0f}"
             )
         
         st.markdown("---")
@@ -650,9 +730,9 @@ with tabs[3]:
         st.plotly_chart(fig_variacion, width='stretch')
         
         df_tabla_var = df_variacion.copy()
-        df_tabla_var[f'{año_base}'] = df_tabla_var[f'{año_base}'].apply(lambda x: f"${x:,.0f}")
-        df_tabla_var[f'{año_comparacion}'] = df_tabla_var[f'{año_comparacion}'].apply(lambda x: f"${x:,.0f}")
-        df_tabla_var['Diferencia'] = df_tabla_var['Diferencia'].apply(lambda x: f"${x:,.0f}")
+        df_tabla_var[f'{año_base}'] = df_tabla_var[f'{año_base}'].apply(lambda x: f"S/ {x:,.0f}")
+        df_tabla_var[f'{año_comparacion}'] = df_tabla_var[f'{año_comparacion}'].apply(lambda x: f"S/ {x:,.0f}")
+        df_tabla_var['Diferencia'] = df_tabla_var['Diferencia'].apply(lambda x: f"S/ {x:,.0f}")
         df_tabla_var['Variación %'] = df_tabla_var['Variación %'].apply(lambda x: f"{x:+.1f}%")
         
         st.dataframe(df_tabla_var, width='stretch', hide_index=True)
@@ -688,7 +768,7 @@ with tabs[4]:
             with col1:
                 st.metric(
                     label=f"Proyección para {año_siguiente}",
-                    value=f"${proyeccion_simple:,.0f}",
+                    value=f"S/ {proyeccion_simple:,.0f}",
                     delta=f"{tasa_promedio*100:+.1f}% vs año anterior"
                 )
             
@@ -711,7 +791,7 @@ with tabs[4]:
                 color='Tipo',
                 markers=True,
                 title=f'Proyección de Gasto - {direccion_proyeccion}',
-                labels={'Gasto': 'Gasto ($)', 'Año': 'Año'}
+                labels={'Gasto': 'Monto (S/)', 'Año': 'Año'}
             )
             fig_proyeccion.update_layout(height=400)
             st.plotly_chart(fig_proyeccion, width='stretch')

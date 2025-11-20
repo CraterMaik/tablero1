@@ -135,11 +135,32 @@ def obtener_presupuestos_df(db: Session):
     
     return df
 
-def cargar_datos_desde_excel(db: Session, archivo, tipo_datos):
-    """Carga datos desde archivo Excel"""
-    df = pd.read_excel(archivo)
+def cargar_datos_desde_archivo(db: Session, archivo, tipo_datos, formato='xlsx'):
+    """Carga datos desde archivo Excel o CSV con validación"""
+    try:
+        if formato == 'csv' or archivo.name.endswith('.csv'):
+            df = pd.read_csv(archivo)
+        else:
+            df = pd.read_excel(archivo)
+    except Exception as e:
+        raise ValueError(f"Error al leer el archivo: {str(e)}")
     
     if tipo_datos == "adquisiciones":
+        columnas_requeridas = ['Código', 'Dirección', 'Meta', 'Año', 'Mes', 'Descripción', 'Monto', 'Estado']
+        columnas_faltantes = set(columnas_requeridas) - set(df.columns)
+        if columnas_faltantes:
+            raise ValueError(f"Faltan columnas requeridas: {', '.join(columnas_faltantes)}")
+        
+        if df.empty:
+            raise ValueError("El archivo no contiene datos")
+        
+        if not df['Mes'].between(1, 12).all():
+            raise ValueError("El mes debe estar entre 1 y 12")
+        
+        estados_validos = ['Completado', 'En Proceso', 'Pendiente']
+        if not df['Estado'].isin(estados_validos).all():
+            raise ValueError(f"El estado debe ser uno de: {', '.join(estados_validos)}")
+        
         for _, row in df.iterrows():
             direccion = db.query(Direccion).filter(Direccion.nombre == row['Dirección']).first()
             if not direccion:
@@ -155,7 +176,7 @@ def cargar_datos_desde_excel(db: Session, archivo, tipo_datos):
             
             adq_existente = db.query(Adquisicion).filter(Adquisicion.codigo == row['Código']).first()
             if adq_existente:
-                adq_existente.monto = row['Monto']
+                adq_existente.monto = float(row['Monto'])
                 adq_existente.descripcion = row['Descripción']
                 adq_existente.estado = row['Estado']
             else:
@@ -174,6 +195,17 @@ def cargar_datos_desde_excel(db: Session, archivo, tipo_datos):
         return True
     
     elif tipo_datos == "presupuestos":
+        columnas_requeridas = ['Dirección', 'Año', 'Presupuesto']
+        columnas_faltantes = set(columnas_requeridas) - set(df.columns)
+        if columnas_faltantes:
+            raise ValueError(f"Faltan columnas requeridas: {', '.join(columnas_faltantes)}")
+        
+        if df.empty:
+            raise ValueError("El archivo no contiene datos")
+        
+        if (df['Presupuesto'] <= 0).any():
+            raise ValueError("El presupuesto debe ser mayor a 0")
+        
         for _, row in df.iterrows():
             direccion = db.query(Direccion).filter(Direccion.nombre == row['Dirección']).first()
             if not direccion:
@@ -199,6 +231,10 @@ def cargar_datos_desde_excel(db: Session, archivo, tipo_datos):
         return True
     
     return False
+
+def cargar_datos_desde_excel(db: Session, archivo, tipo_datos):
+    """Función legacy - usa cargar_datos_desde_archivo"""
+    return cargar_datos_desde_archivo(db, archivo, tipo_datos, 'xlsx')
 
 def obtener_alertas(db: Session):
     """Obtiene todas las alertas activas"""

@@ -44,9 +44,12 @@ Preferred communication style: Simple, everyday language in Spanish.
   - **Alertas** (Alerts): Configurable budget threshold alerts
 
 ### Report Generation
-- **Technology**: ReportLab (PDF), XlsxWriter (Excel)
+- **Technology**: ReportLab (PDF), XlsxWriter (Excel), Kaleido (Image Export)
 - **Rationale**: Enables professional report generation with embedded charts and formatted data
-- **Features**: Multi-sheet Excel workbooks, styled PDF documents with tables
+- **Features**: 
+  - Excel: Multi-sheet workbooks with native Excel charts (column and pie)
+  - PDF: Styled documents with embedded Plotly chart images (PNG format)
+  - Chart Export: Kaleido library with Chromium for PNG generation from Plotly graphs
 
 ## Feature Modules
 
@@ -60,12 +63,13 @@ Preferred communication style: Simple, everyday language in Spanish.
 - Interactive filters: year, department, goal, status
 
 ### 2. Importar/Exportar (Import/Export)
-- **Import**: Load data from Excel files for mass updates
+- **Import**: Load data from Excel (.xlsx) or CSV (.csv) files for mass updates
   - Supported types: acquisitions, budgets
-  - Automatic validation and database update
-- **Export**: Generate reports in PDF or Excel format
-  - Excel: Multiple sheets (acquisitions, budgets, comparisons)
-  - PDF: Formatted summary tables
+  - Automatic validation: column presence, value ranges, valid states
+  - Real-time error reporting with descriptive messages
+- **Export**: Generate comprehensive reports in PDF or Excel format with embedded charts
+  - Excel: Multiple sheets (acquisitions, budgets, comparisons) + native Excel charts (column and pie)
+  - PDF: Formatted summary tables + Plotly graphs exported as PNG images
 
 ### 3. Alertas (Alerts)
 - Configurable budget threshold alerts per department
@@ -122,13 +126,17 @@ Preferred communication style: Simple, everyday language in Spanish.
 - **streamlit**: Core application framework
 - **pandas**: Data manipulation and analysis
 - **plotly**: Interactive data visualization
+- **kaleido**: Plotly chart export to static images (PNG)
 - **numpy**: Numerical computing
 - **sqlalchemy**: ORM for database operations
 - **psycopg2-binary**: PostgreSQL adapter
-- **openpyxl**: Excel file reading
-- **xlsxwriter**: Excel file writing
-- **reportlab**: PDF generation
+- **openpyxl**: Excel file reading (supports .xlsx)
+- **xlsxwriter**: Excel file writing with native chart support
+- **reportlab**: PDF generation with tables and images
 - **pillow**: Image processing for PDF reports
+
+### System Dependencies
+- **chromium**: Web browser required by Kaleido for rendering Plotly charts to PNG images
 
 ### Database
 - PostgreSQL (Neon-backed via Replit integration)
@@ -152,9 +160,21 @@ Preferred communication style: Simple, everyday language in Spanish.
 ## Notes
 
 - Application initializes with example data if database is empty
-- All monetary values formatted with thousand separators
+- **Currency Format**: All monetary values displayed in Peruvian Soles (S/) with thousand separators
+- **Import Validation**: CSV and Excel files validated for required columns, value ranges, and valid states
 - Filters are preserved across interactions within the same session
-- Export functionality generates timestamped files
-- Alert system checks all active alerts against current data
+- Export functionality generates timestamped files with embedded charts
+- Alert system checks all active alerts against current data in real-time
 - Projections use simple linear growth model based on historical average
 - Year-over-year comparisons calculate both percentage and absolute variations
+- Chart exports require Chromium (system dependency) for Kaleido PNG generation
+
+## Recent Changes (November 2025)
+
+- ✅ **Currency Format**: Changed from USD ($) to Peruvian Soles (S/) throughout entire application
+- ✅ **CSV Import**: Added support for CSV file imports with same validation as Excel
+- ✅ **Excel Export with Charts**: Implemented native Excel charts (column and pie) in dedicated "Gráficos" sheet
+- ✅ **PDF Export with Charts**: Implemented Plotly chart export as PNG images embedded in PDF reports
+- ✅ **Import Validation**: Added comprehensive validation for column presence, data types, value ranges, and valid states
+- ✅ **System Dependencies**: Added Chromium as system dependency for Kaleido chart rendering
+- ✅ **Error Handling**: Enhanced import functionality with descriptive error messages for validation failures
