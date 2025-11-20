@@ -204,6 +204,9 @@ The import function expects Excel files with the following structure:
 - ✅ **Excel Parser**: Implemented hierarchical data extraction for programación anual específica files
   - Parses UE codes, Meta codes, and Clasificador from description column
   - Handles 14 budget metric columns including PIM, CERTIFICADO, DEVENGADO, etc.
+  - **Critical Fix (Nov 20)**: Corrected parser logic to detect UE/Meta rows BEFORE filtering on PIM values
+    - UE and Meta rows have empty PIM cells, so must be detected first
+    - Parser now checks pattern matching before numeric validation
 - ✅ **Data Import**: Successfully imported 725 budget records for 2024 from provided Excel file
   - 12 government units (UEs): CIDE, DNCE, DNCN, DTDIS, DTIE, ENEI, OTA, OTAJ, OTD, OTED, OTIN, OTPP
   - 26 budget goals (Metas) extracted from data
