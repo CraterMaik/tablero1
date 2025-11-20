@@ -78,7 +78,19 @@ else:
     
     st.sidebar.header("📋 Detalle por Clasificador")
     
-    clasificadores_unicos = sorted([c for c in df_programacion['Clasificador'].unique() if c and str(c) != 'nan'])
+    # Aplicar filtros a los datos antes de mostrar clasificadores
+    df_filtrado_sidebar = df_programacion.copy()
+    
+    if año_seleccionado != "Todos":
+        df_filtrado_sidebar = df_filtrado_sidebar[df_filtrado_sidebar['Año'] == año_seleccionado]
+    
+    if ue_seleccionada:
+        df_filtrado_sidebar = df_filtrado_sidebar[df_filtrado_sidebar['UE'].isin(ue_seleccionada)]
+    
+    if meta_seleccionada:
+        df_filtrado_sidebar = df_filtrado_sidebar[df_filtrado_sidebar['Meta'].isin(meta_seleccionada)]
+    
+    clasificadores_unicos = sorted([c for c in df_filtrado_sidebar['Clasificador'].unique() if c and str(c) != 'nan'])
     
     if clasificadores_unicos:
         clasificador_seleccionado = st.sidebar.selectbox(
@@ -87,7 +99,7 @@ else:
         )
         
         if clasificador_seleccionado != "Ninguno":
-            df_clasificador = df_programacion[df_programacion['Clasificador'] == clasificador_seleccionado]
+            df_clasificador = df_filtrado_sidebar[df_filtrado_sidebar['Clasificador'] == clasificador_seleccionado]
             
             with st.sidebar.expander(f"📊 Detalle: {clasificador_seleccionado}", expanded=True):
                 st.write(f"**Total registros:** {len(df_clasificador)}")

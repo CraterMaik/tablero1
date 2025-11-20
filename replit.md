@@ -40,6 +40,7 @@ Preferred communication style: Simple, everyday language in Spanish.
   - **UnidadEjecutora** (Executive Units): Government organizational units (UEs) identified by code
   - **MetaPresupuestal** (Budget Goals): Budget allocation categories with codes and descriptions
   - **ProgramacionPresupuestal** (Budget Programming): Detailed budget records with PIM, certified spending, and execution data
+  - **Adquisicion** (Acquisitions): Procurement process records with codes, states, amounts, dates, and providers
   - **Alerta** (Alerts): Configurable budget threshold alerts per UE
 
 ### Report Generation
@@ -52,19 +53,32 @@ Preferred communication style: Simple, everyday language in Spanish.
 
 ## Feature Modules
 
-### 1. Dashboard Principal (Main Dashboard)
+### 1. Presupuestal General (Main Budget Dashboard)
 - Executive summary with key metrics:
-  - Total Registros: Total number of budget records
+  - Total Registros: Total number of budget records (filtered)
   - PIM Total: Total budget allocation (Presupuesto Institucional Modificado)
   - Certificado Total: Total certified spending
   - % Ejecución: Overall execution percentage (Certificado/PIM * 100)
-- Analysis by Unidad Ejecutora (UE) with horizontal bar charts
-- Budget execution percentage by UE with comparison to 100% target
-- PIM vs Certificado comparison with grouped bar charts
-- Detailed budget table with search functionality
-- Interactive filters: Año (Year), UE (Executive Unit), Meta (Budget Goal)
+- Analysis by Unidad Ejecutora (UE):
+  - Grouped bar chart showing PIM and Certificado by UE
+  - Bar chart showing % Ejecución by UE
+- Detailed budget table with filterable data
+- Interactive filters (in sidebar): Año (Year - first), Meta (Budget Goal), UE (Executive Unit)
+- **Navbar lateral**: Detalle por Clasificador section showing breakdown by specific clasificador with filters applied
 
-### 2. Importar/Exportar (Import/Export)
+### 2. Adquisiciones (Acquisitions Dashboard)
+- Executive summary with key metrics:
+  - Total Adquisiciones: Total number of acquisitions (filtered)
+  - Monto Referencial Total: Total referential amount
+  - Monto Adjudicado Total: Total awarded amount
+  - % Avance: Progress percentage (Adjudicado/Referencial * 100)
+- Analysis visualizations:
+  - Pie chart showing acquisitions by Estado (Status)
+  - Grouped bar chart showing Monto Referencial and Monto Adjudicado by UE
+- Detailed acquisitions table with filterable data
+- Same interactive filters as Presupuestal General tab
+
+### 3. Importar/Exportar (Import/Export)
 - **Import**: Load programación anual específica from Excel (.xlsx) files
   - Hierarchical structure parsing (UE → Meta → Clasificador)
   - Automatic extraction of UE codes, Meta codes, and Clasificador from description column
@@ -198,6 +212,7 @@ The import function expects Excel files with the following structure:
 
 ## Recent Changes (November 2025)
 
+### Phase 1: Initial Migration (Early November)
 - ✅ **Complete Schema Restructure**: Migrated from acquisitions model to government budget programming model
   - Old schema: Direcciones, Metas, Presupuestos, Adquisiciones
   - New schema: UnidadEjecutora, MetaPresupuestal, ProgramacionPresupuestal, Alertas
@@ -210,14 +225,29 @@ The import function expects Excel files with the following structure:
 - ✅ **Data Import**: Successfully imported 725 budget records for 2024 from provided Excel file
   - 12 government units (UEs): CIDE, DNCE, DNCN, DTDIS, DTIE, ENEI, OTA, OTAJ, OTD, OTED, OTIN, OTPP
   - 26 budget goals (Metas) extracted from data
-- ✅ **Dashboard Adaptation**: Updated all visualizations and metrics for budget execution tracking
-  - Replaced acquisition metrics with PIM, CERTIFICADO, % Ejecución
-  - Updated filters to use UE instead of Direccion
-  - Modified charts to show budget execution percentages
-- ✅ **Database Session Management**: Fixed SSL connection issues by:
-  - Removing init_db() call from app startup
-  - Using fresh sessions with try/finally blocks in each tab
-  - Eliminating unnecessary database queries during initialization
-- ✅ **Alert System**: Updated to work with UnidadEjecutora instead of Direccion
-- ✅ **Export Functionality**: Adapted Excel and PDF export to new schema
-- ✅ **Currency Format**: Maintained Peruvian Soles (S/) format throughout
+
+### Phase 2: Dashboard Reorganization (Late November)
+- ✅ **Expanded Database Schema**: Added Adquisicion table for procurement tracking
+  - Fields: año, UE, meta, código_adquisición, descripción, tipo_proceso, estado, montos, fechas, proveedor
+- ✅ **Generated Seed Data**: Created comprehensive test data for 2024 and 2025
+  - 1,094 Programación Presupuestal records
+  - 548 Adquisicion records
+  - 12 Unidades Ejecutoras
+  - 10 Metas Presupuestales
+- ✅ **Complete Dashboard Reorganization**: Restructured entire application with dual-tab architecture
+  - **New Tab 1 - Presupuestal General**: Budget programming dashboard with PIM/Certificado metrics and visualizations
+  - **New Tab 2 - Adquisiciones**: Procurement dashboard with referential/adjudicated amounts and status tracking
+  - Maintained secondary tabs: Importar/Exportar, Alertas, Análisis Comparativo
+- ✅ **Filter Reorganization**: Changed filter order in sidebar for better UX
+  - New order: Año (first), Meta, UE
+  - All filters apply to both main tabs
+- ✅ **Navbar Lateral Implementation**: Added "Detalle por Clasificador" sidebar section
+  - Allows drilling down into specific budget classifiers
+  - Shows breakdown by UE with filtered metrics
+  - Respects all active filters (año, meta, UE)
+- ✅ **Database Session Management**: Enhanced caching and session handling
+  - Applied @st.cache_data(ttl=60) to both data loading functions
+  - Proper try/finally blocks for session cleanup
+  - Minimized SSL connection issues
+- ✅ **Data Query Functions**: Added obtener_adquisiciones_df() for procurement data retrieval
+- ✅ **Currency Format**: Maintained Peruvian Soles (S/) format throughout both dashboards
