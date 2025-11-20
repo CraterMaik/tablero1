@@ -15,11 +15,13 @@ from db_operations import (
     inicializar_datos_ejemplo, 
     obtener_programacion_df, 
     obtener_adquisiciones_df,
+    obtener_detalle_adquisicion,
     procesar_archivo_programacion, 
     obtener_alertas, 
     crear_alerta, 
     eliminar_alerta
 )
+from database import SessionLocal as DirectSessionLocal
 
 st.set_page_config(page_title="Dashboard de Programación Presupuestal", layout="wide", initial_sidebar_state="expanded")
 
@@ -40,6 +42,109 @@ def cargar_datos_adquisiciones():
     try:
         df_adquisiciones = obtener_adquisiciones_df(db)
         return df_adquisiciones
+    finally:
+        db.close()
+
+@st.dialog("Detalle de Adquisición", width="large")
+def mostrar_detalle_adquisicion(codigo_adquisicion):
+    """Modal para mostrar el detalle completo de una adquisición con timeline"""
+    db = DirectSessionLocal()
+    try:
+        detalle_completo = obtener_detalle_adquisicion(db, codigo_adquisicion)
+        
+        if not detalle_completo:
+            st.error("No se encontró la adquisición")
+            return
+        
+        adq = detalle_completo['adquisicion']
+        detalle = detalle_completo['detalle']
+        procesos = detalle_completo['procesos']
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader(f"{codigo_adquisicion}")
+            st.write(f"**{adq.descripcion}**")
+        
+        with col2:
+            if detalle:
+                st.metric("PIM Asignado", f"S/ {detalle.pim_asignado:,.0f}")
+        
+        col_a, col_b, col_c, col_d = st.columns(4)
+        
+        with col_a:
+            if detalle:
+                st.metric("Requerimientos", f"{detalle.requerimientos_adquiridos}/{detalle.requerimientos_total}")
+        
+        with col_b:
+            st.metric("Estado", adq.estado)
+        
+        with col_c:
+            st.metric("Monto Referencial", f"S/ {adq.monto_referencial:,.0f}")
+        
+        with col_d:
+            st.metric("Monto Adjudicado", f"S/ {adq.monto_adjudicado:,.0f}")
+        
+        if detalle:
+            st.info(f"**Unidad Responsable:** {detalle.unidad_responsable} | **Tipo:** {detalle.tipo_servicio}")
+        
+        st.divider()
+        
+        if procesos:
+            st.subheader("📅 Timeline del Proceso")
+            
+            df_procesos = pd.DataFrame([{
+                'Orden': p.orden,
+                'Hito': p.hito,
+                'Area': p.tipo_flujo,
+                'Fecha_Inicio': p.fecha_inicio,
+                'Fecha_Fin': p.fecha_fin if p.fecha_fin else p.fecha_inicio,
+                'Dias': p.dias_transcurridos,
+                'Responsable': p.responsable_correo
+            } for p in procesos])
+            
+            fig_timeline = px.timeline(
+                df_procesos,
+                x_start='Fecha_Inicio',
+                x_end='Fecha_Fin',
+                y='Hito',
+                color='Area',
+                hover_data=['Dias', 'Responsable'],
+                title="Flujo de Proceso de Adquisición",
+                color_discrete_map={'OTIN': '#FFB84D', 'OTA': '#90EE90'}
+            )
+            
+            fig_timeline.update_layout(
+                height=400,
+                yaxis={'categoryorder': 'array', 'categoryarray': df_procesos['Hito'].tolist()[::-1]},
+                xaxis_title="Fecha",
+                yaxis_title="",
+                showlegend=True
+            )
+            
+            st.plotly_chart(fig_timeline, use_container_width=True)
+            
+            total_dias = sum(p.dias_transcurridos for p in procesos)
+            st.metric("**Total de Días del Proceso**", f"{total_dias} días")
+            
+            st.divider()
+            st.subheader("📋 Detalle de Pasos del Proceso")
+            
+            df_procesos_tabla = pd.DataFrame([{
+                'Orden': p.orden,
+                'Hito': p.hito,
+                'Área': p.tipo_flujo,
+                'Días': p.dias_transcurridos,
+                'Fecha Inicio': p.fecha_inicio.strftime('%d/%m/%Y') if p.fecha_inicio else '',
+                'Responsable': p.responsable_correo if p.responsable_correo else '',
+                'Comentarios': p.comentarios if p.comentarios else ''
+            } for p in procesos])
+            
+            st.dataframe(df_procesos_tabla, use_container_width=True, hide_index=True)
+        
+        else:
+            st.info("No hay información de proceso disponible para esta adquisición")
+    
     finally:
         db.close()
 
@@ -74,50 +179,6 @@ else:
         default=ues_disponibles
     )
     
-    st.sidebar.markdown("---")
-    
-    st.sidebar.header("📋 Detalle por Clasificador")
-    
-    # Aplicar filtros a los datos antes de mostrar clasificadores
-    df_filtrado_sidebar = df_programacion.copy()
-    
-    if año_seleccionado != "Todos":
-        df_filtrado_sidebar = df_filtrado_sidebar[df_filtrado_sidebar['Año'] == año_seleccionado]
-    
-    if ue_seleccionada:
-        df_filtrado_sidebar = df_filtrado_sidebar[df_filtrado_sidebar['UE'].isin(ue_seleccionada)]
-    
-    if meta_seleccionada:
-        df_filtrado_sidebar = df_filtrado_sidebar[df_filtrado_sidebar['Meta'].isin(meta_seleccionada)]
-    
-    clasificadores_unicos = sorted([c for c in df_filtrado_sidebar['Clasificador'].unique() if c and str(c) != 'nan'])
-    
-    if clasificadores_unicos:
-        clasificador_seleccionado = st.sidebar.selectbox(
-            "Seleccionar Clasificador",
-            options=["Ninguno"] + clasificadores_unicos
-        )
-        
-        if clasificador_seleccionado != "Ninguno":
-            df_clasificador = df_filtrado_sidebar[df_filtrado_sidebar['Clasificador'] == clasificador_seleccionado]
-            
-            with st.sidebar.expander(f"📊 Detalle: {clasificador_seleccionado}", expanded=True):
-                st.write(f"**Total registros:** {len(df_clasificador)}")
-                st.write(f"**PIM Total:** S/ {df_clasificador['PIM'].sum():,.0f}")
-                st.write(f"**Certificado Total:** S/ {df_clasificador['Certificado'].sum():,.0f}")
-                
-                pct_exec = (df_clasificador['Certificado'].sum() / df_clasificador['PIM'].sum() * 100) if df_clasificador['PIM'].sum() > 0 else 0
-                st.write(f"**% Ejecución:** {pct_exec:.2f}%")
-                
-                st.markdown("**Por UE:**")
-                detalle_ue = df_clasificador.groupby('UE').agg({
-                    'PIM': 'sum',
-                    'Certificado': 'sum'
-                }).reset_index()
-                
-                for _, row in detalle_ue.iterrows():
-                    st.write(f"- {row['UE']}: S/ {row['Certificado']:,.0f}")
-
 tabs = st.tabs([
     "💰 Presupuestal General", 
     "🛒 Adquisiciones", 
@@ -231,6 +292,65 @@ with tabs[0]:
         fig_ejecucion.update_layout(height=400, showlegend=False)
         fig_ejecucion.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="Meta 100%")
         st.plotly_chart(fig_ejecucion, use_container_width=True)
+    
+    st.markdown("---")
+    
+    st.subheader("📊 Análisis por Clasificador Presupuestal")
+    
+    clasificadores_agregado = df_filtrado.groupby('Clasificador').agg({
+        'PIM': 'sum',
+        'Certificado': 'sum'
+    }).reset_index()
+    clasificadores_agregado = clasificadores_agregado.sort_values('PIM', ascending=False).head(10)
+    
+    col_c1, col_c2 = st.columns(2)
+    
+    with col_c1:
+        st.write("**Top 10 Clasificadores por Presupuesto**")
+        
+        fig_clasificadores = go.Figure()
+        
+        fig_clasificadores.add_trace(go.Bar(
+            name='PIM',
+            y=clasificadores_agregado['Clasificador'],
+            x=clasificadores_agregado['PIM'],
+            marker_color='lightcoral',
+            orientation='h'
+        ))
+        
+        fig_clasificadores.add_trace(go.Bar(
+            name='Certificado',
+            y=clasificadores_agregado['Clasificador'],
+            x=clasificadores_agregado['Certificado'],
+            marker_color='darkred',
+            orientation='h'
+        ))
+        
+        fig_clasificadores.update_layout(
+            xaxis_title='Monto (S/)',
+            yaxis_title='',
+            barmode='group',
+            height=400,
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig_clasificadores, use_container_width=True)
+    
+    with col_c2:
+        st.write("**Distribución de Presupuesto por Clasificador**")
+        
+        fig_treemap = px.treemap(
+            clasificadores_agregado,
+            path=['Clasificador'],
+            values='PIM',
+            color='Certificado',
+            color_continuous_scale='Reds',
+            hover_data={'PIM': ':,.0f', 'Certificado': ':,.0f'}
+        )
+        
+        fig_treemap.update_layout(height=400)
+        
+        st.plotly_chart(fig_treemap, use_container_width=True)
     
     st.markdown("---")
     
@@ -364,7 +484,10 @@ with tabs[1]:
         
         st.subheader("📋 Tabla Detallada de Adquisiciones")
         
-        busqueda_adq = st.text_input("🔎 Buscar en descripción de adquisiciones:", "")
+        col_busq, col_sel, col_btn = st.columns([3, 2, 1])
+        
+        with col_busq:
+            busqueda_adq = st.text_input("🔎 Buscar en descripción de adquisiciones:", "")
         
         df_adq_tabla = df_adq_filtrado.copy()
         
@@ -374,6 +497,24 @@ with tabs[1]:
                 df_adq_tabla['Proveedor'].str.contains(busqueda_adq, case=False, na=False)
             ]
         
+        with col_sel:
+            if len(df_adq_tabla) > 0:
+                codigos_disponibles = df_adq_tabla['Código'].unique().tolist()
+                codigo_seleccionado = st.selectbox(
+                    "Seleccionar Adquisición:",
+                    options=codigos_disponibles,
+                    index=0,
+                    key="selector_adquisicion"
+                )
+            else:
+                codigo_seleccionado = None
+        
+        with col_btn:
+            st.write("")
+            st.write("")
+            if codigo_seleccionado and st.button("👁️ Ver Detalle", key="btn_ver_detalle", use_container_width=True):
+                mostrar_detalle_adquisicion(codigo_seleccionado)
+        
         df_adq_display = df_adq_tabla[['Año', 'UE', 'Meta', 'Código', 'Descripción', 'Tipo_Proceso', 'Estado', 'Monto_Referencial', 'Monto_Adjudicado', 'Proveedor', 'Avance_%']].copy()
         df_adq_display['Monto_Referencial'] = df_adq_display['Monto_Referencial'].apply(lambda x: f"S/ {x:,.0f}")
         df_adq_display['Monto_Adjudicado'] = df_adq_display['Monto_Adjudicado'].apply(lambda x: f"S/ {x:,.0f}")
@@ -382,7 +523,9 @@ with tabs[1]:
             df_adq_display,
             use_container_width=True,
             hide_index=True,
-            height=400
+            height=400,
+            on_select="rerun",
+            selection_mode="single-row"
         )
         
         st.caption(f"Mostrando {len(df_adq_tabla)} de {len(df_adquisiciones)} adquisiciones totales")
