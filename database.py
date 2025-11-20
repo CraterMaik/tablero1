@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -9,63 +9,60 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-class Direccion(Base):
-    __tablename__ = 'direcciones'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, unique=True, nullable=False)
-    activo = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    presupuestos = relationship("Presupuesto", back_populates="direccion")
-    adquisiciones = relationship("Adquisicion", back_populates="direccion")
-
-class Meta(Base):
-    __tablename__ = 'metas'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, unique=True, nullable=False)
-    activo = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    adquisiciones = relationship("Adquisicion", back_populates="meta")
-
-class Presupuesto(Base):
-    __tablename__ = 'presupuestos'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    direccion_id = Column(Integer, ForeignKey('direcciones.id'), nullable=False)
-    año = Column(Integer, nullable=False)
-    monto = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    direccion = relationship("Direccion", back_populates="presupuestos")
-
-class Adquisicion(Base):
-    __tablename__ = 'adquisiciones'
+class UnidadEjecutora(Base):
+    __tablename__ = 'unidades_ejecutoras'
     
     id = Column(Integer, primary_key=True, index=True)
     codigo = Column(String, unique=True, nullable=False)
-    direccion_id = Column(Integer, ForeignKey('direcciones.id'), nullable=False)
-    meta_id = Column(Integer, ForeignKey('metas.id'), nullable=False)
+    nombre = Column(String, nullable=True)
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    programaciones = relationship("ProgramacionPresupuestal", back_populates="unidad_ejecutora")
+
+class MetaPresupuestal(Base):
+    __tablename__ = 'metas_presupuestales'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, nullable=False)
+    descripcion = Column(Text, nullable=False)
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    programaciones = relationship("ProgramacionPresupuestal", back_populates="meta")
+
+class ProgramacionPresupuestal(Base):
+    __tablename__ = 'programacion_presupuestal'
+    
+    id = Column(Integer, primary_key=True, index=True)
     año = Column(Integer, nullable=False)
-    mes = Column(Integer, nullable=False)
-    descripcion = Column(String, nullable=False)
-    monto = Column(Float, nullable=False)
-    estado = Column(String, nullable=False)
+    unidad_ejecutora_id = Column(Integer, ForeignKey('unidades_ejecutoras.id'), nullable=False)
+    meta_id = Column(Integer, ForeignKey('metas_presupuestales.id'), nullable=True)
+    clasificador = Column(String, nullable=True)
+    descripcion_clasificador = Column(Text, nullable=True)
+    
+    pim = Column(Float, default=0)
+    certificado = Column(Float, default=0)
+    pim_por_certificar = Column(Float, default=0)
+    compromiso_anual = Column(Float, default=0)
+    devengado_acumulado = Column(Float, default=0)
+    compromiso_por_devengar = Column(Float, default=0)
+    pim_por_devengar = Column(Float, default=0)
+    total_anual = Column(Float, default=0)
+    saldo = Column(Float, default=0)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    direccion = relationship("Direccion", back_populates="adquisiciones")
-    meta = relationship("Meta", back_populates="adquisiciones")
+    unidad_ejecutora = relationship("UnidadEjecutora", back_populates="programaciones")
+    meta = relationship("MetaPresupuestal", back_populates="programaciones")
 
 class Alerta(Base):
     __tablename__ = 'alertas'
     
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    direccion_id = Column(Integer, ForeignKey('direcciones.id'), nullable=True)
+    unidad_ejecutora_id = Column(Integer, ForeignKey('unidades_ejecutoras.id'), nullable=True)
     umbral_porcentaje = Column(Float, nullable=False)
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
