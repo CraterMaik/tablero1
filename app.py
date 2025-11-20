@@ -206,7 +206,7 @@ with col1:
         color_continuous_scale='Blues'
     )
     fig_dir.update_layout(height=400, showlegend=False)
-    st.plotly_chart(fig_dir, use_container_width=True)
+    st.plotly_chart(fig_dir, width='stretch')
 
 with col2:
     # Número de adquisiciones por dirección
@@ -224,14 +224,14 @@ with col2:
         color_continuous_scale='Greens'
     )
     fig_adq_dir.update_layout(height=400, showlegend=False)
-    st.plotly_chart(fig_adq_dir, use_container_width=True)
+    st.plotly_chart(fig_adq_dir, width='stretch')
 
 st.markdown("---")
 
 # SECCIÓN 3: ANÁLISIS DE PRESUPUESTO VS GASTO
 st.header("💰 Presupuesto vs Gasto por Dirección")
 
-# Calcular gasto y presupuesto por dirección y año
+# Calcular gasto y presupuesto por dirección y año usando datos filtrados
 if año_seleccionado != "Todos":
     años_analisis = [año_seleccionado]
 else:
@@ -240,82 +240,91 @@ else:
 datos_comparacion = []
 for año in años_analisis:
     for direccion in direccion_seleccionada if direccion_seleccionada else direcciones_disponibles:
-        gasto = df_adquisiciones[
-            (df_adquisiciones['Año'] == año) & 
-            (df_adquisiciones['Dirección'] == direccion)
+        # Usar df_filtrado para respetar todos los filtros (meta, estado, etc.)
+        gasto = df_filtrado[
+            (df_filtrado['Año'] == año) & 
+            (df_filtrado['Dirección'] == direccion)
         ]['Monto'].sum()
         
-        presupuesto = df_presupuestos[
+        # Obtener presupuesto para esta dirección y año
+        presupuesto_data = df_presupuestos[
             (df_presupuestos['Año'] == año) & 
             (df_presupuestos['Dirección'] == direccion)
-        ]['Presupuesto'].values[0]
+        ]['Presupuesto'].values
         
-        porcentaje = (gasto / presupuesto * 100) if presupuesto > 0 else 0
-        
-        datos_comparacion.append({
-            'Año': año,
-            'Dirección': direccion,
-            'Presupuesto': presupuesto,
-            'Gasto': gasto,
-            'Disponible': presupuesto - gasto,
-            'Porcentaje': porcentaje
-        })
+        # Validar que existe el presupuesto
+        if len(presupuesto_data) > 0:
+            presupuesto = presupuesto_data[0]
+            porcentaje = (gasto / presupuesto * 100) if presupuesto > 0 else 0
+            
+            datos_comparacion.append({
+                'Año': año,
+                'Dirección': direccion,
+                'Presupuesto': presupuesto,
+                'Gasto': gasto,
+                'Disponible': presupuesto - gasto,
+                'Porcentaje': porcentaje
+            })
 
 df_comparacion = pd.DataFrame(datos_comparacion)
 
-# Gráfico de comparación
-fig_comp = go.Figure()
+# Verificar si hay datos para mostrar
+if len(df_comparacion) > 0:
+    # Gráfico de comparación
+    fig_comp = go.Figure()
 
-fig_comp.add_trace(go.Bar(
-    name='Presupuesto',
-    x=df_comparacion['Dirección'] + ' - ' + df_comparacion['Año'].astype(str),
-    y=df_comparacion['Presupuesto'],
-    marker_color='lightblue'
-))
+    fig_comp.add_trace(go.Bar(
+        name='Presupuesto',
+        x=df_comparacion['Dirección'] + ' - ' + df_comparacion['Año'].astype(str),
+        y=df_comparacion['Presupuesto'],
+        marker_color='lightblue'
+    ))
 
-fig_comp.add_trace(go.Bar(
-    name='Gasto',
-    x=df_comparacion['Dirección'] + ' - ' + df_comparacion['Año'].astype(str),
-    y=df_comparacion['Gasto'],
-    marker_color='darkblue'
-))
+    fig_comp.add_trace(go.Bar(
+        name='Gasto',
+        x=df_comparacion['Dirección'] + ' - ' + df_comparacion['Año'].astype(str),
+        y=df_comparacion['Gasto'],
+        marker_color='darkblue'
+    ))
 
-fig_comp.update_layout(
-    title='Comparación Presupuesto vs Gasto Real',
-    xaxis_title='Dirección - Año',
-    yaxis_title='Monto ($)',
-    barmode='group',
-    height=500,
-    xaxis_tickangle=-45
-)
+    fig_comp.update_layout(
+        title='Comparación Presupuesto vs Gasto Real',
+        xaxis_title='Dirección - Año',
+        yaxis_title='Monto ($)',
+        barmode='group',
+        height=500,
+        xaxis_tickangle=-45
+    )
 
-st.plotly_chart(fig_comp, use_container_width=True)
+    st.plotly_chart(fig_comp, width='stretch')
 
-# Tabla de indicadores de estatus
-st.subheader("📊 Indicadores de Estatus por Dirección")
+    # Tabla de indicadores de estatus
+    st.subheader("📊 Indicadores de Estatus por Dirección")
 
-def obtener_estatus(porcentaje):
-    if porcentaje < 75:
-        return "✅ Dentro de Presupuesto"
-    elif porcentaje < 95:
-        return "⚠️ En Riesgo"
-    else:
-        return "🚨 Excedido/Crítico"
+    def obtener_estatus(porcentaje):
+        if porcentaje < 75:
+            return "✅ Dentro de Presupuesto"
+        elif porcentaje < 95:
+            return "⚠️ En Riesgo"
+        else:
+            return "🚨 Excedido/Crítico"
 
-df_comparacion['Estatus'] = df_comparacion['Porcentaje'].apply(obtener_estatus)
+    df_comparacion['Estatus'] = df_comparacion['Porcentaje'].apply(obtener_estatus)
 
-# Formatear la tabla
-df_tabla = df_comparacion.copy()
-df_tabla['Presupuesto'] = df_tabla['Presupuesto'].apply(lambda x: f"${x:,.0f}")
-df_tabla['Gasto'] = df_tabla['Gasto'].apply(lambda x: f"${x:,.0f}")
-df_tabla['Disponible'] = df_tabla['Disponible'].apply(lambda x: f"${x:,.0f}")
-df_tabla['Porcentaje'] = df_tabla['Porcentaje'].apply(lambda x: f"{x:.1f}%")
+    # Formatear la tabla
+    df_tabla = df_comparacion.copy()
+    df_tabla['Presupuesto'] = df_tabla['Presupuesto'].apply(lambda x: f"${x:,.0f}")
+    df_tabla['Gasto'] = df_tabla['Gasto'].apply(lambda x: f"${x:,.0f}")
+    df_tabla['Disponible'] = df_tabla['Disponible'].apply(lambda x: f"${x:,.0f}")
+    df_tabla['Porcentaje'] = df_tabla['Porcentaje'].apply(lambda x: f"{x:.1f}%")
 
-st.dataframe(
-    df_tabla[['Año', 'Dirección', 'Presupuesto', 'Gasto', 'Disponible', 'Porcentaje', 'Estatus']],
-    use_container_width=True,
-    hide_index=True
-)
+    st.dataframe(
+        df_tabla[['Año', 'Dirección', 'Presupuesto', 'Gasto', 'Disponible', 'Porcentaje', 'Estatus']],
+        width='stretch',
+        hide_index=True
+    )
+else:
+    st.info("ℹ️ No hay datos disponibles para las direcciones y años seleccionados con los filtros actuales.")
 
 st.markdown("---")
 
@@ -336,7 +345,7 @@ with col1:
         hole=0.4
     )
     fig_meta_pie.update_layout(height=400)
-    st.plotly_chart(fig_meta_pie, use_container_width=True)
+    st.plotly_chart(fig_meta_pie, width='stretch')
 
 with col2:
     # Gasto por meta (barras)
@@ -352,7 +361,7 @@ with col2:
         color_continuous_scale='Oranges'
     )
     fig_meta_bar.update_layout(height=400, showlegend=False)
-    st.plotly_chart(fig_meta_bar, use_container_width=True)
+    st.plotly_chart(fig_meta_bar, width='stretch')
 
 st.markdown("---")
 
@@ -373,7 +382,7 @@ if año_seleccionado == "Todos":
     )
     fig_año.update_traces(line_color='#1f77b4', marker_size=10)
     fig_año.update_layout(height=400)
-    st.plotly_chart(fig_año, use_container_width=True)
+    st.plotly_chart(fig_año, width='stretch')
     
     # Gasto mensual por año
     df_filtrado_mensual = df_filtrado.copy()
@@ -392,7 +401,7 @@ if año_seleccionado == "Todos":
         labels={'Monto': 'Monto ($)', 'Periodo': 'Periodo'}
     )
     fig_mensual.update_layout(height=400, xaxis_tickangle=-45)
-    st.plotly_chart(fig_mensual, use_container_width=True)
+    st.plotly_chart(fig_mensual, width='stretch')
 else:
     # Para un año específico, mostrar tendencia mensual
     df_año = df_filtrado[df_filtrado['Año'] == año_seleccionado].copy()
@@ -409,7 +418,7 @@ else:
         color_continuous_scale='Viridis'
     )
     fig_mensual_año.update_layout(height=400, showlegend=False)
-    st.plotly_chart(fig_mensual_año, use_container_width=True)
+    st.plotly_chart(fig_mensual_año, width='stretch')
 
 st.markdown("---")
 
@@ -436,7 +445,7 @@ df_tabla_display['Monto'] = df_tabla_display['Monto'].apply(lambda x: f"${x:,.0f
 
 st.dataframe(
     df_tabla_display,
-    use_container_width=True,
+    width='stretch',
     hide_index=True,
     height=400
 )
