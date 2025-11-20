@@ -86,8 +86,14 @@ def generar_metas_presupuestales(db):
     print(f"✅ {len(metas)} Metas Presupuestales creadas")
     return metas_dict
 
-def generar_programacion_presupuestal(db, ues_dict, metas_dict, año):
-    """Genera datos de Programación Presupuestal para un año"""
+def generar_programacion_presupuestal(db, ues_dict, metas_dict, año, target_count=547):
+    """Genera datos de Programación Presupuestal para un año
+    
+    Args:
+        target_count: Número objetivo de registros por año (default: 547 para total de 1094)
+    """
+    random.seed(año)
+    
     clasificadores = [
         "2.1. Personal y Obligaciones Sociales",
         "2.3. Bienes y Servicios",
@@ -98,11 +104,23 @@ def generar_programacion_presupuestal(db, ues_dict, metas_dict, año):
     ]
     
     registros = []
-    for ue_codigo, ue in ues_dict.items():
-        for meta_codigo, meta in metas_dict.items():
-            num_clasificadores = random.randint(3, 6)
-            for _ in range(num_clasificadores):
-                clasificador = random.choice(clasificadores)
+    ue_list = list(ues_dict.items())
+    meta_list = list(metas_dict.items())
+    
+    num_combinaciones = len(ue_list) * len(meta_list)
+    clasificadores_por_combinacion = max(1, target_count // num_combinaciones)
+    registros_extra = target_count % num_combinaciones
+    
+    idx_extra = 0
+    for ue_codigo, ue in ue_list:
+        for meta_codigo, meta in meta_list:
+            num_clasificadores = clasificadores_por_combinacion
+            if idx_extra < registros_extra:
+                num_clasificadores += 1
+                idx_extra += 1
+            
+            for i in range(num_clasificadores):
+                clasificador = clasificadores[i % len(clasificadores)]
                 pim = random.uniform(50000, 5000000)
                 ejecucion_pct = random.uniform(0.65, 0.99)
                 certificado = pim * ejecucion_pct
@@ -127,11 +145,21 @@ def generar_programacion_presupuestal(db, ues_dict, metas_dict, año):
     
     db.add_all(registros)
     db.commit()
-    print(f"✅ {len(registros)} registros de Programación Presupuestal para {año}")
-    return len(registros)
+    
+    actual_count = len(registros)
+    assert actual_count == target_count, f"Expected {target_count} records, got {actual_count}"
+    
+    print(f"✅ {actual_count} registros de Programación Presupuestal para {año}")
+    return actual_count
 
-def generar_adquisiciones(db, ues_dict, metas_dict, año):
-    """Genera datos de Adquisiciones para un año"""
+def generar_adquisiciones(db, ues_dict, metas_dict, año, target_count=274):
+    """Genera datos de Adquisiciones para un año
+    
+    Args:
+        target_count: Número objetivo de registros por año (default: 274 para total de 548)
+    """
+    random.seed(año + 1000)
+    
     tipos_proceso = [
         "Licitación Pública",
         "Concurso Público",
@@ -177,11 +205,20 @@ def generar_adquisiciones(db, ues_dict, metas_dict, año):
     ]
     
     registros = []
-    for ue_codigo, ue in ues_dict.items():
-        num_adquisiciones = random.randint(15, 35)
+    ue_list = list(ues_dict.items())
+    num_ues = len(ue_list)
+    
+    adquisiciones_por_ue = target_count // num_ues
+    adquisiciones_extra = target_count % num_ues
+    
+    for idx, (ue_codigo, ue) in enumerate(ue_list):
+        num_adquisiciones = adquisiciones_por_ue
+        if idx < adquisiciones_extra:
+            num_adquisiciones += 1
+        
         for i in range(num_adquisiciones):
-            meta = random.choice(list(metas_dict.values()))
-            estado = random.choice(estados)
+            meta = list(metas_dict.values())[i % len(metas_dict)]
+            estado = estados[i % len(estados)]
             monto_ref = random.uniform(10000, 500000)
             
             if estado in ["Adjudicado", "Contratado", "En Ejecución", "Finalizado"]:
@@ -199,24 +236,33 @@ def generar_adquisiciones(db, ues_dict, metas_dict, año):
                 unidad_ejecutora_id=ue.id,
                 meta_id=meta.id,
                 codigo_adquisicion=f"ADQ-{año}-{ue_codigo}-{i+1:04d}",
-                descripcion=random.choice(descripciones),
-                tipo_proceso=random.choice(tipos_proceso),
+                descripcion=descripciones[i % len(descripciones)],
+                tipo_proceso=tipos_proceso[i % len(tipos_proceso)],
                 estado=estado,
                 monto_referencial=monto_ref,
                 monto_adjudicado=monto_adj,
                 fecha_convocatoria=fecha_conv,
                 fecha_adjudicacion=fecha_adj,
-                proveedor=random.choice(proveedores) if monto_adj > 0 else None
+                proveedor=proveedores[i % len(proveedores)] if monto_adj > 0 else None
             )
             registros.append(adq)
     
     db.add_all(registros)
     db.commit()
-    print(f"✅ {len(registros)} registros de Adquisiciones para {año}")
-    return len(registros)
+    
+    actual_count = len(registros)
+    assert actual_count == target_count, f"Expected {target_count} records, got {actual_count}"
+    
+    print(f"✅ {actual_count} registros de Adquisiciones para {año}")
+    return actual_count
 
 def main():
-    """Función principal para generar datos seed"""
+    """Función principal para generar datos seed
+    
+    Genera exactamente:
+    - 1,094 registros de Programación Presupuestal (547 por año)
+    - 548 registros de Adquisiciones (274 por año)
+    """
     print("\n🌱 Generando datos seed...\n")
     
     crear_tablas()
@@ -227,18 +273,25 @@ def main():
         ues_dict = generar_unidades_ejecutoras(db)
         metas_dict = generar_metas_presupuestales(db)
         
-        total_prog_2024 = generar_programacion_presupuestal(db, ues_dict, metas_dict, 2024)
-        total_prog_2025 = generar_programacion_presupuestal(db, ues_dict, metas_dict, 2025)
+        total_prog_2024 = generar_programacion_presupuestal(db, ues_dict, metas_dict, 2024, target_count=547)
+        total_prog_2025 = generar_programacion_presupuestal(db, ues_dict, metas_dict, 2025, target_count=547)
         
-        total_adq_2024 = generar_adquisiciones(db, ues_dict, metas_dict, 2024)
-        total_adq_2025 = generar_adquisiciones(db, ues_dict, metas_dict, 2025)
+        total_adq_2024 = generar_adquisiciones(db, ues_dict, metas_dict, 2024, target_count=274)
+        total_adq_2025 = generar_adquisiciones(db, ues_dict, metas_dict, 2025, target_count=274)
+        
+        total_prog = total_prog_2024 + total_prog_2025
+        total_adq = total_adq_2024 + total_adq_2025
         
         print(f"\n📊 Resumen:")
         print(f"   - {len(ues_dict)} Unidades Ejecutoras")
         print(f"   - {len(metas_dict)} Metas Presupuestales")
-        print(f"   - {total_prog_2024 + total_prog_2025} Programaciones Presupuestales")
-        print(f"   - {total_adq_2024 + total_adq_2025} Adquisiciones")
-        print(f"\n✅ Datos seed generados exitosamente!\n")
+        print(f"   - {total_prog} Programaciones Presupuestales (2024: {total_prog_2024}, 2025: {total_prog_2025})")
+        print(f"   - {total_adq} Adquisiciones (2024: {total_adq_2024}, 2025: {total_adq_2025})")
+        
+        assert total_prog == 1094, f"Expected 1094 programaciones, got {total_prog}"
+        assert total_adq == 548, f"Expected 548 adquisiciones, got {total_adq}"
+        
+        print(f"\n✅ Datos seed generados exitosamente con cantidades exactas verificadas!\n")
         
     finally:
         db.close()

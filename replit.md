@@ -230,10 +230,11 @@ The import function expects Excel files with the following structure:
 - ✅ **Expanded Database Schema**: Added Adquisicion table for procurement tracking
   - Fields: año, UE, meta, código_adquisición, descripción, tipo_proceso, estado, montos, fechas, proveedor
 - ✅ **Generated Seed Data**: Created comprehensive test data for 2024 and 2025
-  - 1,094 Programación Presupuestal records
-  - 548 Adquisicion records
+  - 1,094 Programación Presupuestal records (547 per year)
+  - 548 Adquisicion records (274 per year)
   - 12 Unidades Ejecutoras
   - 10 Metas Presupuestales
+  - **Deterministic generation**: Uses fixed random seed and target counts with assertions to guarantee exact quantities
 - ✅ **Complete Dashboard Reorganization**: Restructured entire application with dual-tab architecture
   - **New Tab 1 - Presupuestal General**: Budget programming dashboard with PIM/Certificado metrics and visualizations
   - **New Tab 2 - Adquisiciones**: Procurement dashboard with referential/adjudicated amounts and status tracking
