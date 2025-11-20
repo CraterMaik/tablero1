@@ -57,6 +57,29 @@ class ProgramacionPresupuestal(Base):
     unidad_ejecutora = relationship("UnidadEjecutora", back_populates="programaciones")
     meta = relationship("MetaPresupuestal", back_populates="programaciones")
 
+class Adquisicion(Base):
+    __tablename__ = 'adquisiciones'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    año = Column(Integer, nullable=False)
+    unidad_ejecutora_id = Column(Integer, ForeignKey('unidades_ejecutoras.id'), nullable=False)
+    meta_id = Column(Integer, ForeignKey('metas_presupuestales.id'), nullable=True)
+    codigo_adquisicion = Column(String, nullable=True)
+    descripcion = Column(Text, nullable=False)
+    tipo_proceso = Column(String, nullable=True)
+    estado = Column(String, nullable=False)
+    monto_referencial = Column(Float, default=0)
+    monto_adjudicado = Column(Float, default=0)
+    fecha_convocatoria = Column(DateTime, nullable=True)
+    fecha_adjudicacion = Column(DateTime, nullable=True)
+    proveedor = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    unidad_ejecutora = relationship("UnidadEjecutora")
+    meta = relationship("MetaPresupuestal")
+
 class Alerta(Base):
     __tablename__ = 'alertas'
     
