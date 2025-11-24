@@ -640,14 +640,26 @@ with tabs[0]:
         st.markdown("---")
         
         st.subheader("Tabla Detallada de Adquisiciones")
-        
-        col_busq, col_sel, col_btn = st.columns([3, 2, 1])
-        
+
+        col_busq, col_sel = st.columns([2, 3])
+
         with col_busq:
-            busqueda_adq = st.text_input("🔎 Buscar en descripción de adquisiciones:", "")
-        
+            busqueda_adq = st.text_input("🔎 Buscar en descripción:", "")
+
+        with col_sel:
+            adquisiciones_disponibles = df_adq_filtrado['Descripción'].unique().tolist()
+            adquisiciones_seleccionadas = st.multiselect(
+                "Filtrar por Adquisición:",
+                options=adquisiciones_disponibles,
+                default=[],
+                placeholder="Seleccionar adquisiciones..."
+            )
+
         df_adq_tabla = df_adq_filtrado.copy()
-        
+
+        if adquisiciones_seleccionadas:
+            df_adq_tabla = df_adq_tabla[df_adq_tabla['Descripción'].isin(adquisiciones_seleccionadas)]
+
         if busqueda_adq:
             df_adq_tabla = df_adq_tabla[
                 df_adq_tabla['Descripción'].str.contains(busqueda_adq, case=False, na=False) |
