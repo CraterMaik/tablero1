@@ -161,6 +161,14 @@ def mostrar_detalle_adquisicion(codigo_adquisicion):
 
 df_adquisiciones = cargar_datos_adquisiciones()
 
+# Verificar si hay un código de adquisición en la URL (query param)
+query_params = st.query_params
+codigo_adq_url = query_params.get("adq", None)
+
+# Si hay un código en la URL, mostrar el modal automáticamente
+if codigo_adq_url:
+    mostrar_detalle_adquisicion(codigo_adq_url)
+
 # Botón para volver a la landing page
 col_back, col_title = st.columns([1, 5])
 with col_back:
