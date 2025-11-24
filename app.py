@@ -25,11 +25,37 @@ from database import SessionLocal as DirectSessionLocal
 
 st.set_page_config(page_title="Dashboard de Programación Presupuestal", layout="wide", initial_sidebar_state="expanded")
 
+# Estilos CSS personalizados - Fondo azul INEI para métricas
+st.markdown("""
+<style>
+    /* Estilo azul INEI para las métricas del resumen ejecutivo */
+    .metric-inei {
+        background: #1f4e78;
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+    }
+    .metric-inei .metric-label {
+        font-size: 14px;
+        font-weight: 500;
+        opacity: 0.9;
+        margin-bottom: 8px;
+    }
+    .metric-inei .metric-value {
+        font-size: 28px;
+        font-weight: 700;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 @st.cache_data(ttl=60)
-def cargar_datos_programacion():
-    """Carga datos de programación desde la base de datos"""
-    # Las funciones crean su propia sesión internamente
-    return obtener_programacion_df()
+# def cargar_datos_programacion():
+#     """Carga datos de programación desde la base de datos"""
+#     # Las funciones crean su propia sesión internamente
+#     return obtener_programacion_df()
 
 @st.cache_data(ttl=60)
 def cargar_datos_adquisiciones():
@@ -83,7 +109,7 @@ def mostrar_detalle_adquisicion(codigo_adquisicion):
         st.divider()
         
         if procesos:
-            st.subheader("📅 Timeline del Proceso")
+            st.subheader("Timeline del Proceso")
             
             df_procesos = pd.DataFrame([{
                 'Orden': p.orden,
@@ -120,7 +146,7 @@ def mostrar_detalle_adquisicion(codigo_adquisicion):
             st.metric("**Total de Días del Proceso**", f"{total_dias} días")
             
             st.divider()
-            st.subheader("📋 Detalle de Pasos del Proceso")
+            st.subheader("Detalle de Pasos del Proceso")
             
             df_procesos_tabla = pd.DataFrame([{
                 'Orden': p.orden,
@@ -140,293 +166,361 @@ def mostrar_detalle_adquisicion(codigo_adquisicion):
     finally:
         db.close()
 
-df_programacion = cargar_datos_programacion()
+#df_programacion = cargar_datos_programacion()
 df_adquisiciones = cargar_datos_adquisiciones()
 
-st.title("📊 Dashboard de Programación Presupuestal")
+st.title("📊 Dashboard de Adquisiciones")
 
 st.sidebar.header("🔍 Filtros")
 
-if len(df_programacion) == 0:
-    st.warning("⚠️ No hay datos cargados. Por favor, importe un archivo de programación en la pestaña 'Importar/Exportar'")
+if len(df_adquisiciones) == 0:
+     st.warning("⚠️ No hay datos cargados. Por favor, importe un archivo de programación en la pestaña 'Importar/Exportar'")
 else:
-    años_disponibles = sorted(df_programacion['Año'].unique())
+    años_disponibles = sorted(df_adquisiciones['Año'].unique())
+    opciones_año = ["Todos"] + list(años_disponibles)
+    indice_default = opciones_año.index(2025) if 2025 in años_disponibles else 0
     año_seleccionado = st.sidebar.selectbox(
-        "Seleccionar Año",
-        options=["Todos"] + años_disponibles,
-        index=0
+         "Seleccionar Año",
+         options=opciones_año,
+         index=indice_default
     )
     
-    metas_disponibles = sorted(df_programacion['Meta'].unique())
+    metas_disponibles = sorted(df_adquisiciones['Meta'].unique())
     meta_seleccionada = st.sidebar.multiselect(
         "Seleccionar Meta",
         options=metas_disponibles,
         default=metas_disponibles[:5] if len(metas_disponibles) > 5 else metas_disponibles
     )
     
-    ues_disponibles = sorted(df_programacion['UE'].unique())
+    ues_disponibles = sorted(df_adquisiciones['UE'].unique())
     ue_seleccionada = st.sidebar.multiselect(
-        "Seleccionar UE",
+        "Seleccionar DDNNTT",
         options=ues_disponibles,
         default=ues_disponibles
     )
-    
+
+    if len(df_adquisiciones) > 0:
+        tipos_permitidos = ['BIEN', 'SERVICIO']
+        tipos_en_datos = [t for t in tipos_permitidos if t in df_adquisiciones['Tipo_Servicio'].values]
+        tipo_servicio_seleccionado = st.sidebar.multiselect(
+            "Tipo (Bien/Servicio)",
+            options=tipos_permitidos,
+            default=tipos_en_datos
+        )
+
+        estados_permitidos = ['EN PROCESO', 'CULMINADO', 'CANCELADO', 'HISTORICO', 'NO INICIADO']
+        estados_en_datos = [e for e in estados_permitidos if e in df_adquisiciones['Estado'].values]
+        estado_seleccionado = st.sidebar.multiselect(
+            "Estado",
+            options=estados_permitidos,
+            default=estados_en_datos
+        )
+    else:
+        tipo_servicio_seleccionado = []
+        estado_seleccionado = []
+
+    st.sidebar.markdown("---")
+   
+
 tabs = st.tabs([
-    "💰 Presupuestal General", 
+    # "💰 Presupuestal General", 
     "🛒 Adquisiciones", 
     "📤 Importar/Exportar", 
-    "⚠️ Alertas", 
-    "📊 Análisis Comparativo"
+    # "⚠️ Alertas", 
+    # "📊 Análisis Comparativo"
 ])
 
-with tabs[0]:
-    st.header("💰 Presupuestal General")
+# with tabs[0]:
+#     st.header("💰 Presupuestal General")
     
-    if len(df_programacion) == 0:
-        st.warning("⚠️ No hay datos de programación disponibles")
-        st.stop()
+#     if len(df_programacion) == 0:
+#         st.warning("⚠️ No hay datos de programación disponibles")
+#         st.stop()
     
-    df_filtrado = df_programacion.copy()
+#     df_filtrado = df_programacion.copy()
     
-    if año_seleccionado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado['Año'] == año_seleccionado]
+#     if año_seleccionado != "Todos":
+#         df_filtrado = df_filtrado[df_filtrado['Año'] == año_seleccionado]
     
-    if ue_seleccionada:
-        df_filtrado = df_filtrado[df_filtrado['UE'].isin(ue_seleccionada)]
+#     if ue_seleccionada:
+#         df_filtrado = df_filtrado[df_filtrado['UE'].isin(ue_seleccionada)]
     
-    if meta_seleccionada:
-        df_filtrado = df_filtrado[df_filtrado['Meta'].isin(meta_seleccionada)]
+#     if meta_seleccionada:
+#         df_filtrado = df_filtrado[df_filtrado['Meta'].isin(meta_seleccionada)]
     
-    st.subheader("📊 Resumen Ejecutivo")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        total_registros = len(df_filtrado)
-        st.metric(
-            label="Total Registros",
-            value=f"{total_registros:,}"
-        )
-    
-    with col2:
-        total_pim = df_filtrado['PIM'].sum()
-        st.metric(
-            label="PIM Total",
-            value=f"S/ {total_pim:,.0f}"
-        )
-    
-    with col3:
-        total_certificado = df_filtrado['Certificado'].sum()
-        st.metric(
-            label="Certificado Total",
-            value=f"S/ {total_certificado:,.0f}"
-        )
-    
-    with col4:
-        pct_ejecucion = (total_certificado / total_pim * 100) if total_pim > 0 else 0
-        st.metric(
-            label="% Ejecución",
-            value=f"{pct_ejecucion:.1f}%"
-        )
-    
-    st.markdown("---")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 PIM y Certificado por UE")
-        
-        gasto_por_ue = df_filtrado.groupby('UE').agg({
-            'PIM': 'sum',
-            'Certificado': 'sum'
-        }).reset_index()
-        gasto_por_ue = gasto_por_ue.sort_values('Certificado', ascending=False)
-        
-        fig_presup_cert = go.Figure()
-        
-        fig_presup_cert.add_trace(go.Bar(
-            name='PIM',
-            x=gasto_por_ue['UE'],
-            y=gasto_por_ue['PIM'],
-            marker_color='lightblue'
-        ))
-        
-        fig_presup_cert.add_trace(go.Bar(
-            name='Certificado',
-            x=gasto_por_ue['UE'],
-            y=gasto_por_ue['Certificado'],
-            marker_color='darkblue'
-        ))
-        
-        fig_presup_cert.update_layout(
-            xaxis_title='Unidad Ejecutora',
-            yaxis_title='Monto (S/)',
-            barmode='group',
-            height=400,
-            showlegend=True
-        )
-        
-        st.plotly_chart(fig_presup_cert, use_container_width=True)
-    
-    with col2:
-        st.subheader("📈 % Ejecución por UE")
-        
-        gasto_por_ue['Ejecución_%'] = (gasto_por_ue['Certificado'] / gasto_por_ue['PIM'] * 100).round(2)
-        
-        fig_ejecucion = px.bar(
-            gasto_por_ue,
-            x='UE',
-            y='Ejecución_%',
-            labels={'Ejecución_%': '% Ejecución', 'UE': 'Unidad Ejecutora'},
-            color='Ejecución_%',
-            color_continuous_scale='Greens'
-        )
-        fig_ejecucion.update_layout(height=400, showlegend=False)
-        fig_ejecucion.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="Meta 100%")
-        st.plotly_chart(fig_ejecucion, use_container_width=True)
-    
-    st.markdown("---")
-    
-    st.subheader("📊 Análisis por Clasificador Presupuestal")
-    
-    clasificadores_agregado = df_filtrado.groupby('Clasificador').agg({
-        'PIM': 'sum',
-        'Certificado': 'sum'
-    }).reset_index()
-    clasificadores_agregado = clasificadores_agregado.sort_values('PIM', ascending=False).head(10)
-    
-    col_c1, col_c2 = st.columns(2)
-    
-    with col_c1:
-        st.write("**Top 10 Clasificadores por Presupuesto**")
-        
-        fig_clasificadores = go.Figure()
-        
-        fig_clasificadores.add_trace(go.Bar(
-            name='PIM',
-            y=clasificadores_agregado['Clasificador'],
-            x=clasificadores_agregado['PIM'],
-            marker_color='lightcoral',
-            orientation='h'
-        ))
-        
-        fig_clasificadores.add_trace(go.Bar(
-            name='Certificado',
-            y=clasificadores_agregado['Clasificador'],
-            x=clasificadores_agregado['Certificado'],
-            marker_color='darkred',
-            orientation='h'
-        ))
-        
-        fig_clasificadores.update_layout(
-            xaxis_title='Monto (S/)',
-            yaxis_title='',
-            barmode='group',
-            height=400,
-            showlegend=True
-        )
-        
-        st.plotly_chart(fig_clasificadores, use_container_width=True)
-    
-    with col_c2:
-        st.write("**Distribución de Presupuesto por Clasificador**")
-        
-        fig_treemap = px.treemap(
-            clasificadores_agregado,
-            path=['Clasificador'],
-            values='PIM',
-            color='Certificado',
-            color_continuous_scale='Reds',
-            hover_data={'PIM': ':,.0f', 'Certificado': ':,.0f'}
-        )
-        
-        fig_treemap.update_layout(height=400)
-        
-        st.plotly_chart(fig_treemap, use_container_width=True)
-    
-    st.markdown("---")
-    
-    st.subheader("📋 Tabla Detallada")
-    
-    busqueda = st.text_input("🔎 Buscar en descripción:", "")
-    
-    df_tabla_detalle = df_filtrado.copy()
-    
-    if busqueda:
-        df_tabla_detalle = df_tabla_detalle[
-            df_tabla_detalle['Descripción'].str.contains(busqueda, case=False, na=False) |
-            df_tabla_detalle['Meta'].str.contains(busqueda, case=False, na=False)
-        ]
-    
-    df_tabla_display = df_tabla_detalle[['Año', 'UE', 'Meta', 'Clasificador', 'Descripción', 'PIM', 'Certificado', 'PIM_Por_Certificar', 'Ejecución_%']].copy()
-    df_tabla_display['PIM'] = df_tabla_display['PIM'].apply(lambda x: f"S/ {x:,.0f}")
-    df_tabla_display['Certificado'] = df_tabla_display['Certificado'].apply(lambda x: f"S/ {x:,.0f}")
-    df_tabla_display['PIM_Por_Certificar'] = df_tabla_display['PIM_Por_Certificar'].apply(lambda x: f"S/ {x:,.0f}")
-    
-    st.dataframe(
-        df_tabla_display,
-        use_container_width=True,
-        hide_index=True,
-        height=400
-    )
-    
-    st.caption(f"Mostrando {len(df_tabla_detalle)} de {len(df_programacion)} registros totales")
+#     st.subheader("Resumen Ejecutivo")
 
-with tabs[1]:
-    st.header("🛒 Adquisiciones")
+#     col1, col2, col3, col4 = st.columns(4)
+
+#     total_registros = len(df_filtrado)
+#     total_pim = df_filtrado['PIM'].sum()
+#     total_certificado = df_filtrado['Certificado'].sum()
+#     pct_ejecucion = (total_certificado / total_pim * 100) if total_pim > 0 else 0
+
+#     with col1:
+#         st.markdown(f"""
+#         <div class="metric-inei">
+#             <div class="metric-label">Total Registros</div>
+#             <div class="metric-value">{total_registros:,}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     with col2:
+#         st.markdown(f"""
+#         <div class="metric-inei">
+#             <div class="metric-label">PIM Total</div>
+#             <div class="metric-value">S/ {total_pim:,.2f}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     with col3:
+#         st.markdown(f"""
+#         <div class="metric-inei">
+#             <div class="metric-label">Certificado Total</div>
+#             <div class="metric-value">S/ {total_certificado:,.2f}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     with col4:
+#         st.markdown(f"""
+#         <div class="metric-inei">
+#             <div class="metric-label">% Ejecución</div>
+#             <div class="metric-value">{pct_ejecucion:.1f}%</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+    
+#     st.markdown("---")
+    
+#     col1, col2 = st.columns(2)
+    
+#     with col1:
+#         st.subheader("PIM y Certificado por UE")
+        
+#         gasto_por_ue = df_filtrado.groupby('UE').agg({
+#             'PIM': 'sum',
+#             'Certificado': 'sum'
+#         }).reset_index()
+#         gasto_por_ue = gasto_por_ue.sort_values('Certificado', ascending=False)
+        
+#         fig_presup_cert = go.Figure()
+        
+#         fig_presup_cert.add_trace(go.Bar(
+#             name='PIM',
+#             x=gasto_por_ue['UE'],
+#             y=gasto_por_ue['PIM'],
+#             marker_color='lightblue'
+#         ))
+        
+#         fig_presup_cert.add_trace(go.Bar(
+#             name='Certificado',
+#             x=gasto_por_ue['UE'],
+#             y=gasto_por_ue['Certificado'],
+#             marker_color='darkblue'
+#         ))
+        
+#         fig_presup_cert.update_layout(
+#             xaxis_title='Unidad Ejecutora',
+#             yaxis_title='Monto (S/)',
+#             barmode='group',
+#             height=400,
+#             showlegend=True
+#         )
+        
+#         st.plotly_chart(fig_presup_cert, use_container_width=True)
+    
+#     with col2:
+#         st.subheader("% Ejecución por UE")
+        
+#         gasto_por_ue['Ejecución_%'] = (gasto_por_ue['Certificado'] / gasto_por_ue['PIM'] * 100).round(2)
+        
+#         fig_ejecucion = px.bar(
+#             gasto_por_ue,
+#             x='UE',
+#             y='Ejecución_%',
+#             labels={'Ejecución_%': '% Ejecución', 'UE': 'Unidad Ejecutora'},
+#             color='Ejecución_%',
+#             color_continuous_scale='Greens'
+#         )
+#         fig_ejecucion.update_layout(height=400, showlegend=False)
+#         fig_ejecucion.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="Meta 100%")
+#         st.plotly_chart(fig_ejecucion, use_container_width=True)
+    
+#     st.markdown("---")
+    
+#     st.subheader("Análisis por Clasificador Presupuestal")
+    
+#     clasificadores_agregado = df_filtrado.groupby('Clasificador').agg({
+#         'PIM': 'sum',
+#         'Certificado': 'sum'
+#     }).reset_index()
+#     clasificadores_agregado = clasificadores_agregado.sort_values('PIM', ascending=False).head(10)
+    
+#     col_c1, col_c2 = st.columns(2)
+    
+#     with col_c1:
+#         st.write("**Top 10 Clasificadores por Presupuesto**")
+        
+#         fig_clasificadores = go.Figure()
+        
+#         fig_clasificadores.add_trace(go.Bar(
+#             name='PIM',
+#             y=clasificadores_agregado['Clasificador'],
+#             x=clasificadores_agregado['PIM'],
+#             marker_color='lightcoral',
+#             orientation='h'
+#         ))
+        
+#         fig_clasificadores.add_trace(go.Bar(
+#             name='Certificado',
+#             y=clasificadores_agregado['Clasificador'],
+#             x=clasificadores_agregado['Certificado'],
+#             marker_color='darkred',
+#             orientation='h'
+#         ))
+        
+#         fig_clasificadores.update_layout(
+#             xaxis_title='Monto (S/)',
+#             yaxis_title='',
+#             barmode='group',
+#             height=400,
+#             showlegend=True
+#         )
+        
+#         st.plotly_chart(fig_clasificadores, use_container_width=True)
+    
+#     with col_c2:
+#         st.write("**Distribución de Presupuesto por Clasificador**")
+        
+#         fig_treemap = px.treemap(
+#             clasificadores_agregado,
+#             path=['Clasificador'],
+#             values='PIM',
+#             color='Certificado',
+#             color_continuous_scale='Reds',
+#             hover_data={'PIM': ':,.0f', 'Certificado': ':,.0f'}
+#         )
+        
+#         fig_treemap.update_layout(height=400)
+        
+#         st.plotly_chart(fig_treemap, use_container_width=True)
+    
+#     st.markdown("---")
+    
+#     st.subheader("Tabla Detallada")
+    
+#     busqueda = st.text_input("🔎 Buscar en descripción:", "")
+    
+#     df_tabla_detalle = df_filtrado.copy()
+    
+#     if busqueda:
+#         df_tabla_detalle = df_tabla_detalle[
+#             df_tabla_detalle['Descripción'].str.contains(busqueda, case=False, na=False) |
+#             df_tabla_detalle['Meta'].str.contains(busqueda, case=False, na=False)
+#         ]
+    
+#     df_tabla_display = df_tabla_detalle[['Año', 'UE', 'Meta', 'Clasificador', 'Descripción', 'PIM', 'Certificado', 'PIM_Por_Certificar', 'Ejecución_%']].copy()
+#     df_tabla_display['PIM'] = df_tabla_display['PIM'].apply(lambda x: f"S/ {x:,.0f}")
+#     df_tabla_display['Certificado'] = df_tabla_display['Certificado'].apply(lambda x: f"S/ {x:,.0f}")
+#     df_tabla_display['PIM_Por_Certificar'] = df_tabla_display['PIM_Por_Certificar'].apply(lambda x: f"S/ {x:,.0f}")
+    
+#     st.dataframe(
+#         df_tabla_display,
+#         use_container_width=True,
+#         hide_index=True,
+#         height=400
+#     )
+    
+#     st.caption(f"Mostrando {len(df_tabla_detalle)} de {len(df_programacion)} registros totales")
+
+with tabs[0]:
+    # st.header("")
     
     if len(df_adquisiciones) == 0:
         st.info("⚠️ No hay datos de adquisiciones disponibles")
     else:
         df_adq_filtrado = df_adquisiciones.copy()
-        
+
         if año_seleccionado != "Todos":
             df_adq_filtrado = df_adq_filtrado[df_adq_filtrado['Año'] == año_seleccionado]
-        
+
         if ue_seleccionada:
             df_adq_filtrado = df_adq_filtrado[df_adq_filtrado['UE'].isin(ue_seleccionada)]
-        
+
         if meta_seleccionada:
             df_adq_filtrado = df_adq_filtrado[df_adq_filtrado['Meta'].isin(meta_seleccionada)]
-        
-        st.subheader("📊 Resumen Ejecutivo")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
+
+        if tipo_servicio_seleccionado:
+            df_adq_filtrado = df_adq_filtrado[df_adq_filtrado['Tipo_Servicio'].isin(tipo_servicio_seleccionado)]
+
+        if estado_seleccionado:
+            df_adq_filtrado = df_adq_filtrado[df_adq_filtrado['Estado'].isin(estado_seleccionado)]
+
+        st.subheader("Resumen Ejecutivo")
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+
         with col1:
             total_adquisiciones = len(df_adq_filtrado)
-            st.metric(
-                label="Total Adquisiciones",
-                value=f"{total_adquisiciones:,}"
-            )
-        
+            st.markdown(f"""
+            <div class="metric-inei">
+                <div class="metric-label">Total<br>Requerimientos</div>
+                <div class="metric-value">{total_adquisiciones:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         with col2:
-            total_referencial = df_adq_filtrado['Monto_Referencial'].sum()
-            st.metric(
-                label="Monto Referencial Total",
-                value=f"S/ {total_referencial:,.0f}"
-            )
-        
+            total_culminados = len(df_adq_filtrado[df_adq_filtrado['Estado'] == 'CULMINADO'])
+            st.markdown(f"""
+            <div class="metric-inei">
+                <div class="metric-label">Total Adquiridos<br>(Culminados)</div>
+                <div class="metric-value">{total_culminados:,}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         with col3:
-            total_adjudicado = df_adq_filtrado['Monto_Adjudicado'].sum()
-            st.metric(
-                label="Monto Adjudicado Total",
-                value=f"S/ {total_adjudicado:,.0f}"
-            )
-        
+            total_referencial = df_adq_filtrado['Monto_Referencial'].sum()
+            st.markdown(f"""
+            <div class="metric-inei">
+                <div class="metric-label">Monto Total<br>(PIM)</div>
+                <div class="metric-value">S/ {total_referencial:,.2f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         with col4:
-            pct_avance = (total_adjudicado / total_referencial * 100) if total_referencial > 0 else 0
-            st.metric(
-                label="% Avance",
-                value=f"{pct_avance:.1f}%"
-            )
+            monto_culminados = df_adq_filtrado[df_adq_filtrado['Estado'] == 'CULMINADO']['Monto_Adjudicado'].sum()
+            st.markdown(f"""
+            <div class="metric-inei">
+                <div class="metric-label">Monto Adquiridos<br>(Culminados)</div>
+                <div class="metric-value">S/ {monto_culminados:,.2f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         
+
+        # with col4:
+        #     total_adjudicado = df_adq_filtrado['Monto_Adjudicado'].sum()
+        #     st.markdown(f"""
+        #     <div class="metric-inei">
+        #         <div class="metric-label">Monto Adquiridos Total<br>(CERTIFICADO)</div>
+        #         <div class="metric-value">S/ {total_adjudicado:,.2f}</div>
+        #     </div>
+        #     """, unsafe_allow_html=True)
+
+        with col5:
+            pct_avance = (monto_culminados / total_referencial * 100) if total_referencial > 0 else 0
+            st.markdown(f"""
+            <div class="metric-inei">
+                <div class="metric-label">% Avance<br>(Adqui. / PIM)</div>
+                <div class="metric-value">{pct_avance:.1f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         st.markdown("---")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("📊 Adquisiciones por Estado")
+            st.subheader("Adquisiciones por Estado")
             
             adq_por_estado = df_adq_filtrado.groupby('Estado').size().reset_index(name='Cantidad')
             
@@ -440,7 +534,7 @@ with tabs[1]:
             st.plotly_chart(fig_estado, use_container_width=True)
         
         with col2:
-            st.subheader("💰 Montos por UE")
+            st.subheader("Montos por DDNNTT")
             
             montos_por_ue = df_adq_filtrado.groupby('UE').agg({
                 'Monto_Referencial': 'sum',
@@ -450,21 +544,21 @@ with tabs[1]:
             fig_montos = go.Figure()
             
             fig_montos.add_trace(go.Bar(
-                name='Monto Referencial',
+                name='PIM',
                 x=montos_por_ue['UE'],
                 y=montos_por_ue['Monto_Referencial'],
                 marker_color='lightcoral'
             ))
             
             fig_montos.add_trace(go.Bar(
-                name='Monto Adjudicado',
+                name='Monto Adquiridos',
                 x=montos_por_ue['UE'],
                 y=montos_por_ue['Monto_Adjudicado'],
                 marker_color='darkred'
             ))
             
             fig_montos.update_layout(
-                xaxis_title='Unidad Ejecutora',
+                xaxis_title='DDNNTT',
                 yaxis_title='Monto (S/)',
                 barmode='group',
                 height=400
@@ -477,24 +571,31 @@ with tabs[1]:
         col3, col4 = st.columns(2)
         
         with col3:
-            st.subheader("📅 Gasto por Mes")
-            
+            st.subheader("Certificado por Mes")
+
+            # Diccionario de meses en español
+            meses_español = {
+                1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+                5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+                9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+            }
+
             # Preparar datos: extraer mes de fecha de adjudicación
             df_con_fecha = df_adq_filtrado[df_adq_filtrado['Fecha_Adjudicacion'].notna()].copy()
-            
+
             if len(df_con_fecha) > 0:
                 df_con_fecha['Mes'] = pd.to_datetime(df_con_fecha['Fecha_Adjudicacion']).dt.month
-                df_con_fecha['Mes_Nombre'] = pd.to_datetime(df_con_fecha['Fecha_Adjudicacion']).dt.strftime('%B')
-                
+                df_con_fecha['Mes_Nombre'] = df_con_fecha['Mes'].map(meses_español)
+
                 gastos_por_mes = df_con_fecha.groupby(['Mes', 'Mes_Nombre'])['Monto_Adjudicado'].sum().reset_index()
                 gastos_por_mes = gastos_por_mes.sort_values('Mes')
-                
+
                 fig_meses = px.bar(
                     gastos_por_mes,
                     x='Mes_Nombre',
                     y='Monto_Adjudicado',
-                    title='Adquisiciones Gastadas por Mes',
-                    labels={'Monto_Adjudicado': 'Monto Adjudicado (S/)', 'Mes_Nombre': 'Mes'}
+                    title='Adquisiciones Certificados por Mes',
+                    labels={'Monto_Adjudicado': 'Monto Adquirido (S/)', 'Mes_Nombre': 'Mes'}
                 )
                 fig_meses.update_traces(marker_color='steelblue')
                 fig_meses.update_layout(height=400, showlegend=False)
@@ -503,32 +604,42 @@ with tabs[1]:
                 st.info("No hay adquisiciones con fecha de adjudicación para mostrar")
         
         with col4:
-            st.subheader("🏆 Top 10 Más Gastadas")
-            
-            top_10_adq = df_adq_filtrado.nlargest(10, 'Monto_Adjudicado')[['Código', 'Descripción', 'Monto_Adjudicado']].copy()
-            
-            if len(top_10_adq) > 0:
-                # Truncar descripción para mejor visualización
-                top_10_adq['Desc_Corta'] = top_10_adq['Descripción'].str[:30] + '...'
-                
-                fig_top10 = px.bar(
-                    top_10_adq,
-                    x='Monto_Adjudicado',
-                    y='Desc_Corta',
+            st.subheader("% Avance por DDNNTT")
+
+            avance_por_ue = df_adq_filtrado.groupby('UE').agg({
+                'Monto_Referencial': 'sum',
+                'Monto_Adjudicado': 'sum'
+            }).reset_index()
+            avance_por_ue['Avance_%'] = (avance_por_ue['Monto_Adjudicado'] / avance_por_ue['Monto_Referencial'] * 100).round(1)
+            avance_por_ue = avance_por_ue.sort_values('Avance_%', ascending=True)
+
+            if len(avance_por_ue) > 0:
+                fig_avance = px.bar(
+                    avance_por_ue,
+                    x='Avance_%',
+                    y='UE',
                     orientation='h',
-                    title='Top 10 Adquisiciones con Mayor Gasto',
-                    labels={'Monto_Adjudicado': 'Monto Adjudicado (S/)', 'Desc_Corta': 'Adquisición'},
-                    hover_data={'Código': True, 'Descripción': True, 'Desc_Corta': False}
+                    title='Porcentaje de Avance por Unidad Ejecutora',
+                    labels={'Avance_%': '% Avance', 'UE': 'Unidad Ejecutora'},
+                    text='Avance_%'
                 )
-                fig_top10.update_traces(marker_color='darkgreen')
-                fig_top10.update_layout(height=400, showlegend=False, yaxis={'categoryorder': 'total ascending'})
-                st.plotly_chart(fig_top10, use_container_width=True)
+                fig_avance.update_traces(
+                    marker_color='#2c5aa0',
+                    texttemplate='%{text:.1f}%',
+                    textposition='outside'
+                )
+                fig_avance.update_layout(
+                    height=400,
+                    showlegend=False,
+                    xaxis=dict(range=[0, max(avance_por_ue['Avance_%'].max() * 1.15, 100)])
+                )
+                st.plotly_chart(fig_avance, use_container_width=True)
             else:
-                st.info("No hay datos suficientes para mostrar Top 10")
+                st.info("No hay datos suficientes para mostrar avance por UE")
         
         st.markdown("---")
         
-        st.subheader("📋 Tabla Detallada de Adquisiciones")
+        st.subheader("Tabla Detallada de Adquisiciones")
         
         col_busq, col_sel, col_btn = st.columns([3, 2, 1])
         
@@ -543,46 +654,34 @@ with tabs[1]:
                 df_adq_tabla['Proveedor'].str.contains(busqueda_adq, case=False, na=False)
             ]
         
-        with col_sel:
-            if len(df_adq_tabla) > 0:
-                codigos_disponibles = df_adq_tabla['Código'].unique().tolist()
-                codigo_seleccionado = st.selectbox(
-                    "Seleccionar Adquisición:",
-                    options=codigos_disponibles,
-                    index=0,
-                    key="selector_adquisicion"
-                )
-            else:
-                codigo_seleccionado = None
-        
-        with col_btn:
-            st.write("")
-            st.write("")
-            if codigo_seleccionado and st.button("👁️ Ver Detalle", key="btn_ver_detalle", use_container_width=True):
-                mostrar_detalle_adquisicion(codigo_seleccionado)
-        
-        df_adq_display = df_adq_tabla[['Año', 'UE', 'Meta', 'Código', 'Descripción', 'Tipo_Proceso', 'Estado', 'Monto_Referencial', 'Monto_Adjudicado', 'Proveedor', 'Avance_%']].copy()
+        df_adq_display = df_adq_tabla[['Año', 'UE', 'Meta', 'Código', 'Descripción', 'Tipo_Servicio', 'Tipo_Proceso', 'Estado', 'Monto_Referencial', 'Monto_Adjudicado', 'Proveedor', 'Avance_%']].copy()
         df_adq_display['Monto_Referencial'] = df_adq_display['Monto_Referencial'].apply(lambda x: f"S/ {x:,.0f}")
         df_adq_display['Monto_Adjudicado'] = df_adq_display['Monto_Adjudicado'].apply(lambda x: f"S/ {x:,.0f}")
-        
-        st.dataframe(
+
+        seleccion = st.dataframe(
             df_adq_display,
             use_container_width=True,
             hide_index=True,
             height=400,
             on_select="rerun",
-            selection_mode="single-row"
+            selection_mode="single-row",
+            key="tabla_adquisiciones"
         )
-        
+
+        if seleccion and seleccion.selection and seleccion.selection.rows:
+            fila_seleccionada = seleccion.selection.rows[0]
+            codigo_seleccionado_tabla = df_adq_display.iloc[fila_seleccionada]['Código']
+            mostrar_detalle_adquisicion(codigo_seleccionado_tabla)
+
         st.caption(f"Mostrando {len(df_adq_tabla)} de {len(df_adquisiciones)} adquisiciones totales")
 
-with tabs[2]:
-    st.header("📤 Importar y Exportar Datos")
+with tabs[1]:
+    st.header("Importar y Exportar Datos")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("📥 Importar Programación Anual")
+        st.subheader("Importar Programación Anual")
         
         año_importacion = st.number_input(
             "Año de la programación",
@@ -622,7 +721,7 @@ with tabs[2]:
                     db.close()
     
     with col2:
-        st.subheader("📤 Exportar Reportes")
+        st.subheader("Exportar Reportes")
         
         formato_exportacion = st.selectbox(
             "Formato de exportación",
@@ -739,151 +838,10 @@ with tabs[2]:
                     mime="application/pdf"
                 )
 
-with tabs[3]:
-    st.header("⚠️ Alertas de Presupuesto")
-    
-    db = SessionLocal()
-    try:
-        alertas = obtener_alertas(db)
-        
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.subheader("Alertas Activas")
-            if alertas:
-                for alerta in alertas:
-                    ue_nombre = "Todas"
-                    if alerta.unidad_ejecutora_id:
-                        ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.id == alerta.unidad_ejecutora_id).first()
-                        if ue:
-                            ue_nombre = ue.codigo
-                    
-                    col_a, col_b = st.columns([4, 1])
-                    with col_a:
-                        st.info(f"🔔 **{alerta.nombre}** - UE: {ue_nombre} - Umbral: {alerta.umbral_porcentaje}%")
-                    with col_b:
-                        if st.button("Eliminar", key=f"del_{alerta.id}"):
-                            eliminar_alerta(db, alerta.id)
-                            st.rerun()
-            else:
-                st.info("No hay alertas configuradas")
-        
-        with col2:
-            st.subheader("Nueva Alerta")
-            
-            nombre_alerta = st.text_input("Nombre de la alerta")
-            
-            ues = db.query(UnidadEjecutora).all()
-            ue_options = ["Todas"] + [ue.codigo for ue in ues]
-            ue_alerta = st.selectbox("Unidad Ejecutora", ue_options)
-            
-            umbral_alerta = st.slider("Umbral de ejecución (%)", 0, 100, 80)
-            
-            if st.button("Crear Alerta"):
-                if nombre_alerta:
-                    ue_id = None
-                    if ue_alerta != "Todas":
-                        ue_obj = db.query(UnidadEjecutora).filter(UnidadEjecutora.codigo == ue_alerta).first()
-                        if ue_obj:
-                            ue_id = ue_obj.id
-                    
-                    crear_alerta(db, nombre_alerta, ue_id, umbral_alerta)
-                    st.success("✅ Alerta creada exitosamente")
-                    st.rerun()
-                else:
-                    st.error("❌ Ingrese un nombre para la alerta")
-        
-        st.markdown("---")
-        st.subheader("📊 Estado de Alertas")
-        
-        if len(df_programacion) > 0:
-            alertas_activas = df_programacion.groupby('UE').agg({
-                'PIM': 'sum',
-                'Certificado': 'sum'
-            }).reset_index()
-            alertas_activas['Ejecución_%'] = (alertas_activas['Certificado'] / alertas_activas['PIM'] * 100).round(2)
-            
-            for alerta in alertas:
-                if alerta.unidad_ejecutora_id:
-                    ue = db.query(UnidadEjecutora).filter(UnidadEjecutora.id == alerta.unidad_ejecutora_id).first()
-                    if ue:
-                        ue_data = alertas_activas[alertas_activas['UE'] == ue.codigo]
-                        if not ue_data.empty:
-                            ejecucion = ue_data.iloc[0]['Ejecución_%']
-                            if ejecucion >= alerta.umbral_porcentaje:
-                                st.warning(f"⚠️ **{alerta.nombre}**: {ue.codigo} ha alcanzado {ejecucion:.2f}% (Umbral: {alerta.umbral_porcentaje}%)")
-    finally:
-        db.close()
-
-with tabs[4]:
-    st.header("📊 Análisis Comparativo")
-    
-    if len(df_programacion) == 0:
-        st.info("No hay datos disponibles para análisis comparativo")
-    else:
-        años_disponibles = sorted(df_programacion['Año'].unique())
-        
-        if len(años_disponibles) >= 2:
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                año1 = st.selectbox("Año 1", años_disponibles, index=0)
-            
-            with col2:
-                año2 = st.selectbox("Año 2", años_disponibles, index=min(1, len(años_disponibles)-1))
-            
-            df_año1 = df_programacion[df_programacion['Año'] == año1].groupby('UE')['Certificado'].sum().reset_index()
-            df_año1.columns = ['UE', f'Certificado_{año1}']
-            
-            df_año2 = df_programacion[df_programacion['Año'] == año2].groupby('UE')['Certificado'].sum().reset_index()
-            df_año2.columns = ['UE', f'Certificado_{año2}']
-            
-            df_comp = df_año1.merge(df_año2, on='UE', how='outer').fillna(0)
-            df_comp['Variación'] = df_comp[f'Certificado_{año2}'] - df_comp[f'Certificado_{año1}']
-            df_comp['Variación_%'] = ((df_comp[f'Certificado_{año2}'] - df_comp[f'Certificado_{año1}']) / df_comp[f'Certificado_{año1}'] * 100).round(2)
-            df_comp['Variación_%'] = df_comp['Variación_%'].replace([float('inf'), float('-inf')], 0)
-            
-            fig_comp = go.Figure()
-            
-            fig_comp.add_trace(go.Bar(
-                name=str(año1),
-                x=df_comp['UE'],
-                y=df_comp[f'Certificado_{año1}'],
-                marker_color='lightblue'
-            ))
-            
-            fig_comp.add_trace(go.Bar(
-                name=str(año2),
-                x=df_comp['UE'],
-                y=df_comp[f'Certificado_{año2}'],
-                marker_color='darkblue'
-            ))
-            
-            fig_comp.update_layout(
-                title=f'Comparación de Certificado: {año1} vs {año2}',
-                xaxis_title='Unidad Ejecutora',
-                yaxis_title='Certificado (S/)',
-                barmode='group',
-                height=400
-            )
-            
-            st.plotly_chart(fig_comp, use_container_width=True)
-            
-            st.subheader("📈 Tabla Comparativa")
-            
-            df_comp_display = df_comp.copy()
-            df_comp_display[f'Certificado_{año1}'] = df_comp_display[f'Certificado_{año1}'].apply(lambda x: f"S/ {x:,.0f}")
-            df_comp_display[f'Certificado_{año2}'] = df_comp_display[f'Certificado_{año2}'].apply(lambda x: f"S/ {x:,.0f}")
-            df_comp_display['Variación'] = df_comp_display['Variación'].apply(lambda x: f"S/ {x:,.0f}")
-            
-            st.dataframe(df_comp_display, use_container_width=True, hide_index=True)
-        else:
-            st.info("Se necesitan datos de al menos 2 años para realizar comparaciones")
-
 st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: gray; padding: 20px;'>
-    <p>Dashboard de Programación Presupuestal - Generado con Streamlit</p>
+    <p>Dashboard de Programación Presupuestal</p>
     <p>Última actualización: {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
 </div>
 """, unsafe_allow_html=True)

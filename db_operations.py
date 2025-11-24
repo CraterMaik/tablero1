@@ -197,7 +197,7 @@ def obtener_adquisiciones_df(db: Session = None):
         should_close = True
     else:
         should_close = False
-    
+
     try:
         adquisiciones = db.query(
             Adquisicion.año.label('Año'),
@@ -213,9 +213,12 @@ def obtener_adquisiciones_df(db: Session = None):
             Adquisicion.monto_adjudicado.label('Monto_Adjudicado'),
             Adquisicion.proveedor.label('Proveedor'),
             Adquisicion.fecha_convocatoria.label('Fecha_Convocatoria'),
-            Adquisicion.fecha_adjudicacion.label('Fecha_Adjudicacion')
-        ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).all()
-        
+            Adquisicion.fecha_adjudicacion.label('Fecha_Adjudicacion'),
+            AdquisicionDetalle.tipo_servicio.label('Tipo_Servicio')
+        ).join(UnidadEjecutora).outerjoin(MetaPresupuestal).outerjoin(
+            AdquisicionDetalle, Adquisicion.id == AdquisicionDetalle.adquisicion_id
+        ).all()
+
         df = pd.DataFrame([{
             'Año': a.Año,
             'UE': a.UE,
@@ -231,9 +234,10 @@ def obtener_adquisiciones_df(db: Session = None):
             'Proveedor': a.Proveedor if a.Proveedor else 'Sin proveedor',
             'Fecha_Convocatoria': a.Fecha_Convocatoria,
             'Fecha_Adjudicacion': a.Fecha_Adjudicacion,
-            'Avance_%': round((a.Monto_Adjudicado / a.Monto_Referencial * 100) if a.Monto_Referencial > 0 else 0, 2)
+            'Avance_%': round((a.Monto_Adjudicado / a.Monto_Referencial * 100) if a.Monto_Referencial > 0 else 0, 2),
+            'Tipo_Servicio': a.Tipo_Servicio if a.Tipo_Servicio else 'No especificado'
         } for a in adquisiciones])
-        
+
         return df
     finally:
         if should_close:
