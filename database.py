@@ -80,6 +80,7 @@ class Adquisicion(Base):
     tipo_proceso = Column(String, nullable=True)
     estado = Column(String, nullable=False)
     monto_referencial = Column(Float, default=0)
+    cantidad = Column(Integer, default=0)
     monto_adjudicado = Column(Float, default=0)
     fecha_convocatoria = Column(DateTime, nullable=True)
     fecha_adjudicacion = Column(DateTime, nullable=True)

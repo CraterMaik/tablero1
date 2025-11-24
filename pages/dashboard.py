@@ -453,7 +453,7 @@ with tabs[0]:
                 df_adq_tabla['Proveedor'].str.contains(busqueda_adq, case=False, na=False)
             ]
 
-        df_adq_display = df_adq_tabla[['Año', 'UE', 'Meta', 'Código', 'Descripción', 'Tipo_Servicio', 'Tipo_Proceso', 'Estado', 'Monto_Referencial', 'Monto_Adjudicado', 'Proveedor', 'Avance_%']].copy()
+        df_adq_display = df_adq_tabla[['Año', 'UE', 'Meta', 'Código', 'Descripción', 'Tipo_Servicio', 'Cantidad','Tipo_Proceso', 'Estado', 'Monto_Referencial', 'Monto_Adjudicado', 'Proveedor', 'Avance_%']].copy()
         df_adq_display['Monto_Referencial'] = df_adq_display['Monto_Referencial'].apply(lambda x: f"S/ {x:,.0f}")
         df_adq_display['Monto_Adjudicado'] = df_adq_display['Monto_Adjudicado'].apply(lambda x: f"S/ {x:,.0f}")
 
